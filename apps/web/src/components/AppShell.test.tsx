@@ -163,7 +163,7 @@ describe("AppShell", () => {
   );
 
   it.each([390, 1280])(
-    "keeps the header outside the padded page scroll area at %ipx",
+    "keeps bottom clearance in the scrolling content instead of the sticky scrollport at %ipx",
     (width) => {
       Object.defineProperty(window, "innerWidth", {
         configurable: true,
@@ -180,18 +180,30 @@ describe("AppShell", () => {
         "md:relative",
         "md:overflow-visible",
       );
-      const content = container.querySelector('[data-slot="app-page-scroll"]');
-      expect(content).toHaveClass(
+      const scrollport = container.querySelector(
+        '[data-slot="app-page-scroll"]',
+      );
+      expect(scrollport).toHaveClass(
         "min-h-0",
         "overflow-y-auto",
         "overscroll-y-contain",
         "md:overflow-visible",
+      );
+      const bottomPadding =
+        "pb-[calc(var(--spacing-screen-bottom)+env(safe-area-inset-bottom))]";
+      expect(scrollport).not.toHaveClass(bottomPadding);
+      const content = container.querySelector('[data-slot="app-page-content"]');
+      expect(content?.parentElement).toBe(scrollport);
+      expect(content).toContainElement(screen.getByText("Page body"));
+      expect(content).toHaveClass(
+        "flex-1",
+        "flex-col",
         "pb-[calc(var(--spacing-screen-bottom)+env(safe-area-inset-bottom))]",
       );
       expect(content).not.toHaveClass("md:pb-0");
       const header = screen.getByRole("banner");
-      expect(content).not.toContainElement(header);
-      expect(header.parentElement).toBe(content?.parentElement);
+      expect(scrollport).not.toContainElement(header);
+      expect(header.parentElement).toBe(scrollport?.parentElement);
       expect(header).toHaveClass("shrink-0", "bg-card", "sticky", "top-0");
     },
   );

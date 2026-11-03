@@ -8,6 +8,7 @@ import { v1 } from "@repo/api-shared";
 import { toDateOnlyDate, toDateOnlyString } from "../common/dates/date-only";
 import type { ScooterItpInspection } from "../generated/prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { publishNotificationEvent } from "../notifications/notification-events";
 
 function response(row: ScooterItpInspection): v1.scooters.ScooterItpInspection {
   return v1.scooters.scooterItpInspectionSchema.parse({
@@ -56,7 +57,11 @@ export class ScooterItpService {
     };
   }
 
-  async create(scooterId: string, input: v1.scooters.ScooterItpInput) {
+  async create(
+    scooterId: string,
+    input: v1.scooters.ScooterItpInput,
+    actorId?: string,
+  ) {
     return this.prisma.$transaction(async (tx) => {
       // The same row lock serializes document removal and scooter updates.
       const rows = await tx.$queryRaw<{ id: string }[]>`
@@ -209,23 +214,33 @@ export class ScooterItpService {
           });
         return response(existing);
       }
-      return response(
-        await tx.scooterItpInspection.create({
-          data: {
-            source,
-            effectiveDate:
-              inspectionDate ?? toDateOnlyDate(v1.common.dateOnlyToday())!,
-            result: input.result,
-            certificateNumber: input.certificateNumber,
-            odometerKm: input.odometerKm,
-            cardDocumentId: input.cardDocumentId,
-            certificateDocumentId: input.certificateDocumentId,
-            scooterId,
-            inspectionDate,
-            validUntil: toDateOnlyDate(input.validUntil),
-          },
-        }),
-      );
+      const inspection = await tx.scooterItpInspection.create({
+        data: {
+          source,
+          effectiveDate:
+            inspectionDate ?? toDateOnlyDate(v1.common.dateOnlyToday())!,
+          result: input.result,
+          certificateNumber: input.certificateNumber,
+          odometerKm: input.odometerKm,
+          cardDocumentId: input.cardDocumentId,
+          certificateDocumentId: input.certificateDocumentId,
+          scooterId,
+          inspectionDate,
+          validUntil: toDateOnlyDate(input.validUntil),
+        },
+      });
+      await publishNotificationEvent(tx, {
+        type: "scooter.documents.changed",
+        category: "scooters",
+        actorId,
+        subjectType: "scooter",
+        subjectId: scooterId,
+        scooterId,
+        permissionKey: "scooter_documents.read",
+        targetPath: `/scooters/${scooterId}`,
+        changes: ["itp"],
+      });
+      return response(inspection);
     });
   }
 }

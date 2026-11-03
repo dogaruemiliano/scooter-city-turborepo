@@ -27,9 +27,12 @@ export class FinanceBooksService {
   async update(
     bookId: string,
     input: v1.finance.UpdateFinanceBookInput,
+    actorId?: string,
   ): Promise<v1.finance.FinanceBook> {
     try {
-      return toFinanceBook(await this.repository.update(bookId, input));
+      return toFinanceBook(
+        await this.repository.update(bookId, input, actorId),
+      );
     } catch (error) {
       this.handleError(error);
     }

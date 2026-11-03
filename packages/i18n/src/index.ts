@@ -39,3 +39,8 @@ export {
   type InterpolationValue,
   type InterpolationValues,
 } from "./format";
+
+export {
+  formatNotificationMessage,
+  type NotificationMessageInput,
+} from "./notifications";

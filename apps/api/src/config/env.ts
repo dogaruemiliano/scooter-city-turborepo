@@ -451,6 +451,26 @@ export const envSchema = z
       .default(20)
       .describe("Max delivered OTP emails per direct client IP per UTC hour."),
 
+    /* Notifications ------------------------------------------------------- */
+    NOTIFICATIONS_VAPID_PUBLIC_KEY: z
+      .string()
+      .default("")
+      .describe(
+        "Web Push VAPID public key. Leave all VAPID settings empty to disable external push; the inbox remains available.",
+      ),
+    NOTIFICATIONS_VAPID_PRIVATE_KEY: z
+      .string()
+      .default("")
+      .describe(
+        "Web Push VAPID private key. Keep stable across deployments and store as a secret.",
+      ),
+    NOTIFICATIONS_VAPID_SUBJECT: z
+      .string()
+      .default("")
+      .describe(
+        "VAPID contact URI (mailto: address or HTTPS URL). Required together with both VAPID keys.",
+      ),
+
     /* Mailer -------------------------------------------------------------- */
     MAILER_FROM: z
       .email()
@@ -514,6 +534,61 @@ export const envSchema = z
         });
       }
     };
+
+    const vapidEnabled = !!(
+      v.NOTIFICATIONS_VAPID_PUBLIC_KEY ||
+      v.NOTIFICATIONS_VAPID_PRIVATE_KEY ||
+      v.NOTIFICATIONS_VAPID_SUBJECT
+    );
+    requireIf(
+      vapidEnabled,
+      "NOTIFICATIONS_VAPID_PUBLIC_KEY",
+      "Web Push is configured",
+    );
+    requireIf(
+      vapidEnabled,
+      "NOTIFICATIONS_VAPID_PRIVATE_KEY",
+      "Web Push is configured",
+    );
+    requireIf(
+      vapidEnabled,
+      "NOTIFICATIONS_VAPID_SUBJECT",
+      "Web Push is configured",
+    );
+    if (
+      v.NOTIFICATIONS_VAPID_PUBLIC_KEY &&
+      !/^[A-Za-z0-9_-]{87}$/.test(v.NOTIFICATIONS_VAPID_PUBLIC_KEY)
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["NOTIFICATIONS_VAPID_PUBLIC_KEY"],
+        message:
+          "VAPID public key must be a base64url-encoded uncompressed P-256 public key.",
+      });
+    }
+    if (
+      v.NOTIFICATIONS_VAPID_PRIVATE_KEY &&
+      !/^[A-Za-z0-9_-]{43}$/.test(v.NOTIFICATIONS_VAPID_PRIVATE_KEY)
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["NOTIFICATIONS_VAPID_PRIVATE_KEY"],
+        message:
+          "VAPID private key must be a base64url-encoded P-256 private key.",
+      });
+    }
+    if (
+      v.NOTIFICATIONS_VAPID_SUBJECT &&
+      !/^(mailto:[^\s@]+@[^\s@]+|https:\/\/[^\s]+)$/.test(
+        v.NOTIFICATIONS_VAPID_SUBJECT,
+      )
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["NOTIFICATIONS_VAPID_SUBJECT"],
+        message: "VAPID subject must be a mailto address or HTTPS URL.",
+      });
+    }
 
     // OAuth creds when the matching method is enabled
     if (v.AUTH_GOOGLE_ENABLED) {

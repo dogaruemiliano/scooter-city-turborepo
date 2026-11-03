@@ -46,6 +46,11 @@ export function pwaMetadata(preference: ThemePreference): Metadata {
         })),
       ),
     },
+    // Next emits the unprefixed capable tag; iOS startup images still require
+    // Apple's original tag as well (vercel/next.js#74524).
+    other: {
+      "apple-mobile-web-app-capable": "yes",
+    },
     openGraph: {
       type: "website",
       siteName: "ScooterCity",

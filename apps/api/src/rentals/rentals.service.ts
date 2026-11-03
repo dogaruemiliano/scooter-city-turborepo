@@ -954,7 +954,7 @@ export class RentalsService {
             input.data.observedSpeedKmh != null &&
             input.data.observedSpeedKmh > applicationSpeedLimitKmh)
         ) {
-          await tx.scooterProblem.create({
+          const problem = await tx.scooterProblem.create({
             data: {
               scooterId: rental.scooterId,
               title: "Rental inspection: technical defect",
@@ -969,8 +969,8 @@ export class RentalsService {
           await this.audit.recordRequired(tx, {
             type: AuditEventType.PROBLEM_CREATED,
             userId,
-            targetType: "Scooter",
-            targetId: rental.scooterId,
+            targetType: "ScooterProblem",
+            targetId: problem.id,
             meta: { rentalId: id, source: "rental_inspection" },
           });
         }

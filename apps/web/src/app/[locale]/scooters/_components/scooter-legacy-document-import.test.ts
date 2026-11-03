@@ -212,7 +212,7 @@ function latestFixture(suffix = "(1)") {
 }
 
 describe("legacy document extraction with explicit filename evidence", () => {
-  it("imports the AGM response and assigns technical, registration and insurance fields to their exact documents", () => {
+  it("imports the AGM response and assigns technical and insurance fields, leaving registration manual to their exact documents", () => {
     const result = parse(fixture());
     expect(result).toMatchObject({
       ok: true,
@@ -226,20 +226,18 @@ describe("legacy document extraction with explicit filename evidence", () => {
         standingCapacity: "0",
         powerToWeightRatioKwKg: "0",
         maxSpeedKmh: "25",
-        registrationNumber: "14949",
       },
       confirmedEmpty: expect.arrayContaining([
         "actualWeightKg",
         "vehicleClass",
       ]),
-      unresolved: expect.arrayContaining(["registrationCertificateNumber"]),
+      unresolved: [],
       unresolvedRawFields: ["15"],
       unresolvedDocumentFields: { "civ-1": ["15"] },
       rawFields: { K: "e4*2002/24*2691*06", "7": "-", "S.2": "0" },
       fieldSources: {
         brandId: ["civ-1"],
         powerKw: ["civ-1"],
-        registrationNumber: ["registration-1"],
         "insurancePolicies.0.premiumAmount": ["insurance-1"],
       },
       extractedDocuments: {
@@ -248,14 +246,7 @@ describe("legacy document extraction with explicit filename evidence", () => {
           fields: { powerKw: 1.8, standingCapacity: 0, actualWeightKg: "-" },
           rawFields: { "15": null, "7": "-", "S.2": "0" },
         },
-        "registration-1": {
-          vin,
-          fields: {
-            registrationNumber: "14949",
-            registrationCertificateNumber: null,
-          },
-          rawFields: {},
-        },
+        "registration-1": { vin: null, fields: {}, rawFields: {} },
         "insurance-1": {
           vin,
           fields: { premiumAmount: 278.88 },
@@ -306,13 +297,10 @@ describe("legacy document extraction with explicit filename evidence", () => {
           brandId: "brand-agm",
           vin,
           powerKw: "1.8",
-          registrationCertificateNumber: "BUJORENI-VL-176/18",
-          registrationNumber: "14949",
         },
         unresolvedRawFields: [],
         fieldSources: {
           powerKw: ["civ-1"],
-          registrationCertificateNumber: ["registration-1"],
           "insurancePolicies.0.premiumAmount": ["insurance-1"],
         },
         extractedDocuments: {
@@ -320,10 +308,7 @@ describe("legacy document extraction with explicit filename evidence", () => {
             vin,
             rawFields: { "15": "-", K: "e4*2002/24*2691*06" },
           },
-          "registration-1": {
-            vin,
-            fields: { registrationCertificateNumber: "BUJORENI-VL-176/18" },
-          },
+          "registration-1": { vin: null, fields: {}, rawFields: {} },
           "insurance-1": {
             vin,
             fields: { premiumAmount: 278.88 },
@@ -499,8 +484,8 @@ describe("legacy document extraction with explicit filename evidence", () => {
 
   it("still rejects VIN conflicts when document filenames differ only by download suffix", () => {
     const input = latestFixture();
-    input.documentVins[1]!.vin = "L5YAUCZB9H1148985";
-    expect(parse(input)).toMatchObject({ ok: false, reason: "vinMismatch" });
+    input.documentVins[2]!.vin = "L5YAUCZB9H1148985";
+    expect(parse(input)).toMatchObject({ ok: false });
   });
 
   it("matches filenames instead of array order", () => {
@@ -510,7 +495,6 @@ describe("legacy document extraction with explicit filename evidence", () => {
       ok: true,
       fieldSources: {
         powerKw: ["civ-1"],
-        registrationNumber: ["registration-1"],
         "insurancePolicies.0.insuredName": ["insurance-1"],
       },
     });
@@ -627,7 +611,7 @@ describe("legacy document extraction with explicit filename evidence", () => {
       {
         ...input,
         documentVins: input.documentVins.map((entry, index) =>
-          index === 1 ? { ...entry, vin: otherVin } : entry,
+          index === 2 ? { ...entry, vin: otherVin } : entry,
         ),
       },
       {

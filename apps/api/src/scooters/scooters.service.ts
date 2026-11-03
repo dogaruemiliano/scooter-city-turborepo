@@ -26,6 +26,7 @@ import { Prisma as PrismaRuntime } from "../generated/prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { editorSaveFingerprint } from "../scooter-document-jobs/document-job-lifecycle";
 import { ScooterPhotosService } from "./scooter-photos.service";
+import { publishNotificationEvent } from "../notifications/notification-events";
 
 const galleryCoverPhotos = {
   where: { deletedAt: null, type: "GALLERY_COVER", asset: { deletedAt: null } },
@@ -262,6 +263,16 @@ export class ScootersService {
         );
         await this.civVocabulary.remember(tx, input);
         await this.photos.applyDrafts(tx, scooter.id, preparedPhotos, userId);
+        await publishNotificationEvent(tx, {
+          type: "scooter.created",
+          category: "scooters",
+          actorId: userId,
+          subjectType: "scooter",
+          subjectId: scooter.id,
+          scooterId: scooter.id,
+          permissionKey: "scooters.read",
+          targetPath: `/scooters/${scooter.id}`,
+        });
         return input.insurancePolicies?.length ||
           preparedPhotos.length ||
           input.itpValidUntil !== undefined ||
@@ -375,7 +386,7 @@ export class ScootersService {
       if (replay) return replay;
       const existing = await this.prisma.scooter.findFirst({
         where: { id, deletedAt: null },
-        include: { civDocument: true },
+        include: scooterInclude,
       });
       if (!existing) {
         throw new NotFoundException("Scooter not found");
@@ -513,6 +524,28 @@ export class ScootersService {
           input.civIssuedAt !== undefined,
         );
         await this.civVocabulary.remember(tx, input);
+        const after = await tx.scooter.findUniqueOrThrow({
+          where: { id },
+          include: scooterInclude,
+        });
+        const changes = Object.keys(existing).filter(
+          (key) =>
+            key !== "updatedAt" &&
+            JSON.stringify(existing[key as keyof typeof existing]) !==
+              JSON.stringify(after[key as keyof typeof after]),
+        );
+        if (changes.length)
+          await publishNotificationEvent(tx, {
+            type: "scooter.updated",
+            category: "scooters",
+            actorId: userId,
+            subjectType: "scooter",
+            subjectId: id,
+            scooterId: id,
+            permissionKey: "scooters.read",
+            targetPath: `/scooters/${id}`,
+            changes,
+          });
         return input.insurancePolicies?.length ||
           input.removedInsurancePolicyIds?.length ||
           input.itpValidUntil !== undefined ||
@@ -555,17 +588,27 @@ export class ScootersService {
     return scooter;
   }
 
-  async softDelete(id: string): Promise<void> {
-    const existing = await this.prisma.scooter.findFirst({
-      where: { id, deletedAt: null },
-    });
-    if (!existing) {
-      throw new NotFoundException("Scooter not found");
-    }
-
-    await this.prisma.scooter.update({
-      where: { id },
-      data: { deletedAt: new Date() },
+  async softDelete(id: string, userId?: string): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.scooter.findFirst({
+        where: { id, deletedAt: null },
+      });
+      if (!existing) throw new NotFoundException("Scooter not found");
+      const changed = await tx.scooter.updateMany({
+        where: { id, deletedAt: null },
+        data: { deletedAt: new Date() },
+      });
+      if (!changed.count) throw new NotFoundException("Scooter not found");
+      await publishNotificationEvent(tx, {
+        type: "scooter.deleted",
+        category: "scooters",
+        actorId: userId,
+        subjectType: "scooter",
+        subjectId: id,
+        scooterId: id,
+        permissionKey: "scooters.read",
+        targetPath: null,
+      });
     });
   }
 

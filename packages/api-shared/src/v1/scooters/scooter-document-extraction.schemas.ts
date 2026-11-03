@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { CIV_FIELD_MAPPING } from "../vehicle-civ/civ-field-mapping";
-import { SCOOTER_DOCUMENT_TYPES } from "./scooter-document-types";
+import {
+  SCOOTER_DOCUMENT_TYPES,
+  preferredScooterDocumentVin,
+  scooterDocumentExtractsData,
+} from "./scooter-document-types";
 import { INSURANCE_FIELDS } from "./scooter-insurance.schemas";
 
 /** Only data printed on vehicle documents belongs in an extraction. */
@@ -206,6 +210,59 @@ export const scooterDocumentExtractedDataSchema = scooterDocumentEvidenceSchema
 export type ScooterDocumentExtractedData = z.infer<
   typeof scooterDocumentExtractedDataSchema
 >;
+
+/** Ignore superseded readings when consuming saved jobs; keep historical evidence intact. */
+export function scooterDocumentExtractionForType(
+  type: string,
+  evidence: ScooterDocumentExtractedData,
+): ScooterDocumentExtractedData {
+  if (evidence.documents?.length) {
+    const documents = evidence.documents.map((document) => {
+      if (scooterDocumentExtractsData(document.documentType)) return document;
+      const {
+        vinReview: _review,
+        inspections: _inspections,
+        ...classification
+      } = document;
+      return {
+        ...classification,
+        vin: null,
+        fields: {},
+        rawFields: {},
+        issues: [],
+      };
+    });
+    const eligible = documents.filter((document) =>
+      scooterDocumentExtractsData(document.documentType),
+    );
+    return {
+      ...evidence,
+      vin: preferredScooterDocumentVin(eligible),
+      fields: Object.fromEntries(
+        Object.entries(evidence.fields).filter(([field, value]) =>
+          eligible.some(
+            (document) =>
+              Object.hasOwn(document.fields, field) &&
+              document.fields[field] === value,
+          ),
+        ),
+      ),
+      rawFields: Object.fromEntries(
+        Object.entries(evidence.rawFields).filter(([key, value]) =>
+          eligible.some(
+            (document) =>
+              key.startsWith(`${document.id}:`) ||
+              document.rawFields[key] === value,
+          ),
+        ),
+      ),
+      documents,
+    };
+  }
+  if (scooterDocumentExtractsData(type)) return evidence;
+  const { vinReview: _review, ...classification } = evidence;
+  return { ...classification, vin: null, fields: {}, rawFields: {} };
+}
 
 export const scooterDocumentExtractionUpdateSchema = z
   .object({

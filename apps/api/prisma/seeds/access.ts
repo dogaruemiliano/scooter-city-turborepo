@@ -31,6 +31,7 @@ export const initialRoles: {
     slug: "mechanic",
     name: "Mechanic",
     permissions: [
+      { permissionKey: "notifications.receive", scopes: ["ASSIGNED"] },
       { permissionKey: "problems.read", scopes: ["ASSIGNED", "AVAILABLE"] },
       { permissionKey: "problems.claim", scopes: ["AVAILABLE"] },
       { permissionKey: "problems.update", scopes: ["ASSIGNED"] },

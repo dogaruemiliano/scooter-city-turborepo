@@ -196,39 +196,6 @@ export function buildScooterInputCandidate(
   return { input };
 }
 
-export function buildScooterRegistrationInputCandidate(
-  form: ScooterFormState,
-  messages: ScooterFormMessages,
-): {
-  input?: Pick<
-    v1.scooters.UpdateScooterInput,
-    | "registrationType"
-    | "registrationNumber"
-    | "registrationDate"
-    | "temporaryRegistrationExpiresAt"
-    | "requiredLicenseCategory"
-  >;
-  errors?: ScooterFormErrors;
-} {
-  const errors: ScooterFormErrors = {};
-  const registration = buildRegistrationInput(form, messages, errors);
-
-  if (Object.keys(errors).length > 0) {
-    return { errors };
-  }
-
-  return {
-    input: registration.input as Pick<
-      v1.scooters.UpdateScooterInput,
-      | "registrationType"
-      | "registrationNumber"
-      | "registrationDate"
-      | "temporaryRegistrationExpiresAt"
-      | "requiredLicenseCategory"
-    >,
-  };
-}
-
 export function fieldFromIssue(
   issue: ScooterFormIssue,
 ): ScooterFormField | null {

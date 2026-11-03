@@ -7,6 +7,7 @@ import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { PrismaService } from "../prisma/prisma.service";
 import { ImageStorageService } from "../image-storage/image-storage.service";
 import type { StoredImage } from "../image-storage/image-storage.types";
+import { publishNotificationEvent } from "../notifications/notification-events";
 
 export const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
 
@@ -93,6 +94,20 @@ export class UserAvatarService {
         await tx.mediaAsset.update({
           where: { id: user.avatar.id },
           data: { deletedAt: new Date() },
+        });
+      if (user.avatar?.id !== asset?.id)
+        await publishNotificationEvent(tx, {
+          type: "user.updated",
+          category: "access",
+          actorId: uploadedByUserId,
+          subjectType: "user",
+          subjectId: userId,
+          subjectLabel: [user.firstName, user.lastName]
+            .filter(Boolean)
+            .join(" "),
+          permissionKey: "users.read",
+          targetPath: `/users/${userId}`,
+          changes: ["avatar"],
         });
       return user.avatar;
     });

@@ -1,3 +1,5 @@
+import { ScheduleModule } from "@nestjs/schedule";
+
 // Runs before setup-env.ts can supply the unit-test defaults. E2E tests write
 // real data, so a missing/filtered URL must never select the development DB.
 if (!process.env.DATABASE_URL?.trim()) {
@@ -6,4 +8,14 @@ if (!process.env.DATABASE_URL?.trim()) {
   );
 }
 
-export {};
+// HTTP suites own their database fixtures and teardown. Scheduled dispatchers
+// must not consume those fixtures or keep queries running after app.close().
+// Worker regressions invoke their handlers explicitly instead.
+const forRoot = ScheduleModule.forRoot.bind(
+  ScheduleModule,
+) as typeof ScheduleModule.forRoot;
+jest
+  .spyOn(ScheduleModule, "forRoot")
+  .mockImplementation((options) =>
+    forRoot({ ...options, cronJobs: false, intervals: false, timeouts: false }),
+  );

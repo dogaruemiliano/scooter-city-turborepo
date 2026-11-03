@@ -42,11 +42,14 @@ import {
 
 const MAX_VIN_LENGTH = 17;
 
-/** A mixed PDF can contain a CIV even when another logical document is its primary type. */
-export function hasScooterCivDocumentEvidence(document: {
-  type?: string;
-  extractedData?: unknown;
-}): boolean {
+/** Logical document types take precedence over a mixed PDF's primary type. */
+export function hasScooterDocumentType(
+  document: {
+    type?: string;
+    extractedData?: unknown;
+  },
+  type: string,
+): boolean {
   const data = document.extractedData;
   if (
     data &&
@@ -60,9 +63,16 @@ export function hasScooterCivDocumentEvidence(document: {
         child &&
         typeof child === "object" &&
         "documentType" in child &&
-        child.documentType === "civ",
+        child.documentType === type,
     );
-  return document.type === "civ";
+  return document.type === type;
+}
+
+export function hasScooterCivDocumentEvidence(document: {
+  type?: string;
+  extractedData?: unknown;
+}): boolean {
+  return hasScooterDocumentType(document, "civ");
 }
 
 export function hasScooterCivEvidence(input: {
@@ -476,6 +486,19 @@ export const createScooterInputSchema = z
     validateScooterCivOptions(input, ctx);
     validateScooterCivAvailability(input, ctx);
     validateScooterRegistrationForCreate(input, ctx);
+    if (
+      input.documentDrafts?.some((document) =>
+        hasScooterDocumentType(document, "registration_certificate"),
+      ) &&
+      (!input.registrationType || input.registrationType === "unregistered")
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["registrationType"],
+        message:
+          "Select a registration type and enter the plate number from the attached certificate.",
+      });
+    }
   })
   .meta({ id: "CreateScooterInput" });
 

@@ -35,6 +35,7 @@ export function canVisit(
   if (path === "/roles" || path.startsWith("/roles/"))
     return canAccess(user, "roles.read");
   const actions: Record<string, string> = {
+    "/notifications": "notifications.receive",
     "/persons": "persons.read",
     "/scooters": "scooters.read",
     "/scooters/brands": "scooter_brands.read",

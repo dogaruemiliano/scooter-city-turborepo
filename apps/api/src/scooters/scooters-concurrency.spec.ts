@@ -24,7 +24,10 @@ describe("scooter editor concurrency", () => {
       $queryRaw: jest
         .fn()
         .mockResolvedValue([{ updatedAt: new Date(lockedTimestamp) }]),
-      scooter: { update: jest.fn().mockResolvedValue(scooter) },
+      scooter: {
+        update: jest.fn().mockResolvedValue(scooter),
+        findUniqueOrThrow: jest.fn().mockResolvedValue(scooter),
+      },
     };
     const prisma = {
       scooter: { findFirst: jest.fn().mockResolvedValue(scooter) },

@@ -17,11 +17,7 @@ export function itpValidityReadings(documents: Evidence[]) {
   const rows = documents
     .flatMap((document) =>
       (document.extractedData?.documents ?? [])
-        .filter(
-          (entry) =>
-            entry.documentType === "itp_card" ||
-            entry.documentType === "itp_certificate",
-        )
+        .filter((entry) => entry.documentType === "itp_certificate")
         .flatMap((entry) =>
           (entry.inspections ?? [])
             .filter(

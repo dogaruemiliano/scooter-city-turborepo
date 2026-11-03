@@ -6,6 +6,7 @@ import {
 import { v1 } from "@repo/api-shared";
 import { PrismaService } from "../prisma/prisma.service";
 import type { Prisma } from "../generated/prisma/client";
+import { publishNotificationEvent } from "../notifications/notification-events";
 import {
   insurancePolicyResponse,
   writeInsurancePolicies,
@@ -50,7 +51,12 @@ export class ScooterInsuranceService {
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     };
   }
-  async delete(id: string, policyId: string, expectedUpdatedAt: string) {
+  async delete(
+    id: string,
+    policyId: string,
+    expectedUpdatedAt: string,
+    actorId?: string,
+  ) {
     return this.prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<
         { id: string }[]
@@ -103,10 +109,15 @@ export class ScooterInsuranceService {
           ),
         },
       });
+      await this.changed(tx, id, actorId);
       return this.load(tx, id);
     });
   }
-  async update(id: string, input: v1.scooters.ScooterInsuranceSave) {
+  async update(
+    id: string,
+    input: v1.scooters.ScooterInsuranceSave,
+    actorId?: string,
+  ) {
     return this.prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<
         { id: string }[]
@@ -124,7 +135,7 @@ export class ScooterInsuranceService {
           code: "SCOOTER_UPDATE_CONFLICT",
           message: "Scooter changed. Reload before saving insurance.",
         });
-      await writeInsurancePolicies(
+      const revisions = await writeInsurancePolicies(
         tx,
         id,
         scooter.vin,
@@ -139,7 +150,22 @@ export class ScooterInsuranceService {
           ),
         },
       });
+      if (revisions.length) await this.changed(tx, id, actorId);
       return this.load(tx, id);
+    });
+  }
+
+  private changed(tx: Prisma.TransactionClient, id: string, actorId?: string) {
+    return publishNotificationEvent(tx, {
+      type: "scooter.insurance.changed",
+      category: "scooters",
+      actorId,
+      subjectType: "scooter",
+      subjectId: id,
+      scooterId: id,
+      permissionKey: "scooter_documents.read",
+      targetPath: `/scooters/${id}`,
+      changes: ["insurance"],
     });
   }
 }

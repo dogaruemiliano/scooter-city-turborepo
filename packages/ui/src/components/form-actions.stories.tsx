@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Button } from "@repo/ui/components/button";
 import { Card, CardContent } from "@repo/ui/components/card";
 import { FormActions } from "@repo/ui/components/form-actions";
+import { PageLayout } from "@repo/ui/components/page-layout";
 import { SaveButton } from "@repo/ui/components/save-button";
 
 const meta = {
@@ -75,14 +76,22 @@ export const RaisedSurface: Story = {
   ),
 };
 
-/** The page end has less clearance than the floating inset, including device safe areas. */
+/** Floating clearance uses the larger of the normal edge gap and the device safe area. */
 export const StickyCard: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "The floating card uses max(spacing-4, safe-area-inset-bottom), preserving the normal browser gap without adding it on top of the iPhone home-indicator inset. Page-end padding matches the app shell.",
+      },
+    },
+  },
   render: () => (
     <form className="grid min-w-0 gap-8 px-4 pb-[calc(var(--spacing-screen-bottom)+env(safe-area-inset-bottom))] sm:px-8">
       <div className="min-h-dvh">
         <p className="text-sm text-muted-foreground">
-          Scroll to see the action card float above the screen edge and settle
-          with a smaller gap below it at the end of the form.
+          Scroll to see the action card float above the screen edge while
+          respecting the device safe area.
         </p>
       </div>
       <FormActions sticky status="Review the required details before saving.">
@@ -92,6 +101,60 @@ export const StickyCard: Story = {
         <Button type="button">Save details and finish</Button>
       </FormActions>
     </form>
+  ),
+};
+
+/** Mirrors the mobile app shell: the scrollport itself must not have bottom padding. */
+export const StickyInPageScroll: Story = {
+  parameters: {
+    layout: "fullscreen",
+    docs: {
+      description: {
+        story:
+          "Bottom safe-area padding belongs to the scrolling content, not the scrollport. Putting it on the scrollport adds it to the sticky card's bottom offset and raises the actions twice on iOS.",
+      },
+    },
+  },
+  args: { ready: true, pending: false },
+  render: (args) => (
+    <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-background">
+      <header className="flex h-[calc(var(--spacing-16)+env(safe-area-inset-top))] shrink-0 items-center border-b border-border bg-card px-4 pt-[env(safe-area-inset-top)]">
+        Page header
+      </header>
+      <div
+        data-slot="app-page-scroll"
+        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-y-contain"
+      >
+        <div
+          data-slot="app-page-content"
+          className="flex min-w-0 flex-1 flex-col pb-[calc(var(--spacing-screen-bottom)+env(safe-area-inset-bottom))]"
+        >
+          <PageLayout>
+            <form className="grid min-w-0 gap-8">
+              <Card className="min-h-dvh">
+                <CardContent>
+                  Scroll to check that the actions stay near the screen edge and
+                  the final fields remain reachable.
+                </CardContent>
+              </Card>
+              <FormActions {...args}>
+                <Button type="button" variant="outline" disabled={args.pending}>
+                  Cancel
+                </Button>
+                <SaveButton
+                  type="button"
+                  state={args.pending ? "pending" : "idle"}
+                  disabled={!args.ready}
+                  idleLabel="Save changes"
+                  pendingLabel="Saving changes…"
+                  successLabel="Changes saved"
+                />
+              </FormActions>
+            </form>
+          </PageLayout>
+        </div>
+      </div>
+    </div>
   ),
 };
 

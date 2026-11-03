@@ -455,6 +455,21 @@ export function prepareDocumentSources(
       Object.hasOwn(extractedDocuments, attached.sourceId)
     )
       return fail("invalidSources", entry.sourceId);
+    // Old saved readings and manual JSON imports must follow the same policy
+    // as new AI output. Supporting attachments contribute classification only.
+    if (!v1.scooters.scooterDocumentExtractsData(attached.type)) {
+      extractedDocuments[attached.sourceId] = {
+        vin: null,
+        fields: {},
+        rawFields: {},
+      };
+      evidence.push({
+        fileName: attached.fileName,
+        documentType: attached.type,
+        vin: null,
+      });
+      continue;
+    }
     const vin = normalizeVin(entry.vin);
     if (vin === undefined)
       return fail("invalidFields", `${attached.fileName}.vin`);

@@ -29,6 +29,7 @@ import { InfiniteListFooter } from "@/components/InfiniteListFooter";
 import { ListSearchInput } from "@/components/ListSearchInput";
 import { webApi } from "@/lib/api";
 import { ScooterList } from "./ScooterList";
+import { useScootersListScroll } from "./useScootersListScroll";
 
 interface ScootersPageProps {
   createHref: string;
@@ -89,6 +90,23 @@ function ScootersPageContent({
   const pendingSearchRef = useRef<string | null>(null);
   const searchDebounceTimeoutRef = useRef<number | null>(null);
   const listPathnameRef = useRef<string | null>(null);
+
+  const restoreList = useCallback(
+    (
+      savedList: v1.scooters.ScooterList,
+      savedQuery: v1.scooters.ListScootersQuery,
+    ) => {
+      setList(savedList);
+      setQuery(savedQuery);
+      setDraftQuery(savedQuery);
+    },
+    [],
+  );
+  const { pageRef, onClickCapture } = useScootersListScroll(
+    list,
+    query,
+    restoreList,
+  );
 
   const clearSearchDebounce = useCallback(() => {
     if (searchDebounceTimeoutRef.current === null) {
@@ -359,7 +377,7 @@ function ScootersPageContent({
   };
 
   return (
-    <PageLayout>
+    <PageLayout ref={pageRef} onClickCapture={onClickCapture}>
       <ListLayout
         action={
           canAccess(session?.user, "scooters.create") ? (

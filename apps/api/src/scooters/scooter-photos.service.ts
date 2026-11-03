@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { v1 } from "@repo/api-shared";
+import { publishNotificationEvent } from "../notifications/notification-events";
 import { Prisma } from "../generated/prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { ImageStorageService } from "../image-storage/image-storage.service";
@@ -291,6 +292,7 @@ export class ScooterPhotosService {
           asset: { create: photoAssetData(stored, userId) },
         },
       });
+      await this.changed(tx, id, userId);
     });
     return this.list(id);
   }
@@ -299,6 +301,7 @@ export class ScooterPhotosService {
     id: string,
     photoId: string,
     input: v1.scooters.UpdateScooterPhoto,
+    userId?: string,
   ) {
     await this.prisma.$transaction(async (tx) => {
       await this.lock(tx, id);
@@ -311,6 +314,9 @@ export class ScooterPhotosService {
         },
       });
       if (!photo) throw new NotFoundException("Photo not found");
+      const changed = Object.entries(input).some(
+        ([key, value]) => photo[key as keyof typeof photo] !== value,
+      );
       if (input.type === "GALLERY_COVER") {
         await tx.scooterPhoto.updateMany({
           where: { scooterId: id, deletedAt: null, type: "GALLERY_COVER" },
@@ -318,16 +324,17 @@ export class ScooterPhotosService {
         });
       }
       await tx.scooterPhoto.update({ where: { id: photoId }, data: input });
+      if (changed) await this.changed(tx, id, userId);
     });
     return this.list(id);
   }
 
-  async reorder(id: string, photoIds: string[]) {
+  async reorder(id: string, photoIds: string[], userId?: string) {
     await this.prisma.$transaction(async (tx) => {
       await this.lock(tx, id);
       const photos = await tx.scooterPhoto.findMany({
         where: { scooterId: id, deletedAt: null, ...galleryFilter },
-        select: { id: true },
+        select: { id: true, position: true },
       });
       const ids = new Set(photoIds);
       if (
@@ -343,11 +350,13 @@ export class ScooterPhotosService {
           where: { id: photoId },
           data: { position },
         });
+      if (photos.some((photo) => photoIds.indexOf(photo.id) !== photo.position))
+        await this.changed(tx, id, userId);
     });
     return this.list(id);
   }
 
-  async remove(id: string, photoId: string) {
+  async remove(id: string, photoId: string, userId?: string) {
     await this.prisma.$transaction(async (tx) => {
       await this.lock(tx, id);
       const photo = await tx.scooterPhoto.findFirst({
@@ -378,8 +387,23 @@ export class ScooterPhotosService {
             data: { type: "GALLERY_COVER" },
           });
       }
+      await this.changed(tx, id, userId);
     });
     return this.list(id);
+  }
+
+  private changed(tx: Prisma.TransactionClient, id: string, actorId?: string) {
+    return publishNotificationEvent(tx, {
+      type: "scooter.photos.changed",
+      category: "scooters",
+      actorId,
+      subjectType: "scooter",
+      subjectId: id,
+      scooterId: id,
+      permissionKey: "scooters.read",
+      targetPath: `/scooters/${id}`,
+      changes: ["photos"],
+    });
   }
 
   async content(id: string, photoId: string) {

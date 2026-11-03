@@ -20,7 +20,13 @@ describe("ScooterPhotosService", () => {
     checksumSha256: "a".repeat(64),
   };
   const prisma = {
-    scooter: { findFirst: jest.fn(), updateMany: jest.fn() },
+    scooter: {
+      findFirst: jest.fn(),
+      findUnique: jest.fn(),
+      updateMany: jest.fn(),
+    },
+    user: { findMany: jest.fn(), findUnique: jest.fn() },
+    notificationEvent: { create: jest.fn() },
     scooterPhoto: {
       findFirst: jest.fn(),
       findMany: jest.fn(),
@@ -49,6 +55,13 @@ describe("ScooterPhotosService", () => {
         run(prisma as unknown as Prisma.TransactionClient),
     );
     prisma.scooter.findFirst.mockResolvedValue({ id: "scooter-1" });
+    prisma.scooter.findUnique.mockResolvedValue({
+      id: "scooter-1",
+      fleetNumber: 7,
+      brand: { code: "HON" },
+    });
+    prisma.user.findMany.mockResolvedValue([]);
+    prisma.user.findUnique.mockResolvedValue(null);
     prisma.scooter.updateMany.mockResolvedValue({ count: 1 });
     prisma.scooterPhoto.findFirst.mockResolvedValue(photo);
     prisma.scooterPhoto.findMany.mockResolvedValue([]);
@@ -181,6 +194,9 @@ describe("ScooterPhotosService", () => {
         data: { isPublic },
       });
       expect(prisma.scooterPhoto.updateMany).not.toHaveBeenCalled();
+      expect(prisma.notificationEvent.create).toHaveBeenCalledTimes(
+        isPublic ? 1 : 0,
+      );
     },
   );
 

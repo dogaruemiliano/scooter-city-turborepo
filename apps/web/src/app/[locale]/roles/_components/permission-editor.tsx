@@ -43,7 +43,11 @@ import {
 } from "../_lib/permission-presentation";
 
 const permissionGroups = [
-  { key: "administration", icon: ShieldCheck, prefixes: ["users.", "roles."] },
+  {
+    key: "administration",
+    icon: ShieldCheck,
+    prefixes: ["users.", "roles.", "notifications."],
+  },
   {
     key: "fleet",
     icon: Truck,

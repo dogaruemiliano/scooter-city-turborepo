@@ -109,6 +109,13 @@ export const accessCatalog = {
       clearFilters: "Show all permissions",
     },
     descriptions: {
+      notifications: {
+        receive:
+          "Receive business activity or updates to assigned scooter issues, subject to source access.",
+        activity: {
+          read: "View authorized business activity, including your own actions.",
+        },
+      },
       users: {
         read: "View users, roles, and effective permissions.",
         invite: "Create accounts and manage invitations for non-admin users.",
@@ -241,6 +248,10 @@ export const accessCatalog = {
       },
     },
     permissions: {
+      notifications: {
+        receive: "Notifications · Receive",
+        activity: { read: "Notifications · View activity history" },
+      },
       users: {
         read: "Users · View",
         invite: "Users · Invite",
@@ -478,6 +489,13 @@ export const accessCatalog = {
       clearFilters: "Arată toate permisiunile",
     },
     descriptions: {
+      notifications: {
+        receive:
+          "Primește activitate de afaceri sau actualizări ale problemelor atribuite, conform accesului la sursă.",
+        activity: {
+          read: "Vezi activitatea permisă, inclusiv propriile acțiuni.",
+        },
+      },
       users: {
         read: "Vezi utilizatorii, rolurile și permisiunile efective.",
         invite:
@@ -621,6 +639,10 @@ export const accessCatalog = {
       },
     },
     permissions: {
+      notifications: {
+        receive: "Notificări · Primire",
+        activity: { read: "Notificări · Vizualizare istoric activitate" },
+      },
       users: {
         read: "Utilizatori · Vizualizare",
         invite: "Utilizatori · Invitare",

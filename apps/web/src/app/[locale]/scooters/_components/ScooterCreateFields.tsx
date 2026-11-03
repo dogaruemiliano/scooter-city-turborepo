@@ -32,6 +32,7 @@ export function ScooterCreateFields({
   disabled,
   photos,
   compliance,
+  registrationCertificateAttached = false,
 }: {
   editing?: boolean;
   brands: v1.scooterBrands.ScooterBrand[];
@@ -39,6 +40,7 @@ export function ScooterCreateFields({
   disabled: boolean;
   photos?: ReactNode;
   compliance?: (startNumber: number) => ReactNode;
+  registrationCertificateAttached?: boolean;
 }) {
   const t = useTranslations("scooters");
   const {
@@ -143,12 +145,14 @@ export function ScooterCreateFields({
         ) : null}
       </FormSection>
       <ScooterInitialRegistrationFields
+        registrationCertificateAttached={registrationCertificateAttached}
         panel
         number={photos ? 4 : 3}
         status={
           <ScooterSectionComplete
             fields={
-              registration === "unregistered"
+              registration === "unregistered" &&
+              !registrationCertificateAttached
                 ? ["registrationType"]
                 : [
                     "registrationType",

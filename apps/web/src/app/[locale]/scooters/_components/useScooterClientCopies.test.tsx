@@ -25,6 +25,95 @@ afterEach(async () => {
   vi.resetAllMocks();
 });
 describe("client copy generation", () => {
+  it("waits for every generated copy to upload before completing the batch", async () => {
+    mocks.generate.mockImplementation(
+      async (file: File) =>
+        new File(["copy"], `${file.name}-client.png`, { type: "image/png" }),
+    );
+    mocks.api.mockImplementation(async (path: string) =>
+      path.endsWith("editor-sessions")
+        ? { id: "session", expiresAt: "2099-01-01" }
+        : {
+            method: "PUT",
+            uploadUrl: "/upload",
+            uploadToken: "copy-token",
+            maxBytes: 1000000,
+            headers: {},
+          },
+    );
+    const uploads: ((value: { ok: boolean }) => void)[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) =>
+        url === "/upload"
+          ? new Promise((resolve) => uploads.push(resolve))
+          : Promise.resolve({
+              ok: true,
+              blob: async () => new Blob(["original"]),
+            }),
+      ),
+    );
+    let id = 0;
+    vi.stubGlobal("crypto", {
+      randomUUID: () => `copy-${++id}`,
+      subtle: { digest: async () => new ArrayBuffer(32) },
+    });
+    const hook = renderHook(() =>
+      useScooterDocuments([original, { ...original, id: "second" }]),
+    );
+    const completed = vi.fn();
+    let generating!: ReturnType<
+      typeof hook.result.current.generateClientCopies
+    >;
+    act(() => {
+      generating = hook.result.current.generateClientCopies();
+      void generating.then(completed);
+    });
+    await waitFor(() => expect(uploads).toHaveLength(1));
+    expect(hook.result.current.generatingClientCopies).toBe(true);
+    expect(completed).not.toHaveBeenCalled();
+    await act(async () => uploads[0]!({ ok: true }));
+    await waitFor(() => expect(uploads).toHaveLength(2));
+    expect(completed).not.toHaveBeenCalled();
+    expect(hook.result.current.generatingClientCopies).toBe(true);
+    await act(async () => {
+      uploads[1]!({ ok: true });
+      await generating;
+    });
+    expect(completed).toHaveBeenCalledExactlyOnceWith(true);
+    expect(hook.result.current.drafts).toHaveLength(2);
+    expect(
+      hook.result.current.drafts.every((draft) => draft.status === "ready"),
+    ).toBe(true);
+  });
+
+  it("reports failure when a generated copy cannot be uploaded", async () => {
+    mocks.generate.mockResolvedValue(
+      new File(["copy"], "CIV-client.png", { type: "image/png" }),
+    );
+    mocks.api.mockRejectedValue(new Error("Upload unavailable"));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        blob: async () => new Blob(["original"]),
+      }),
+    );
+    vi.stubGlobal("crypto", {
+      randomUUID: () => "copy",
+      subtle: { digest: async () => new ArrayBuffer(32) },
+    });
+    const hook = renderHook(() => useScooterDocuments([original]));
+    let result: boolean | undefined;
+    await act(async () => {
+      result = await hook.result.current.generateClientCopies();
+    });
+    expect(result).toBe(false);
+    expect(hook.result.current.clientCopyError).toBe(true);
+    expect(hook.result.current.drafts[0]?.status).toBe("failed");
+    expect(hook.result.current.generatingClientCopies).toBe(false);
+  });
+
   it("blocks submission while generating, prevents duplicate generation, and uploads only the paired copy", async () => {
     let complete!: (file: File) => void;
     mocks.generate.mockReturnValue(
@@ -45,19 +134,19 @@ describe("client copy generation", () => {
     );
     vi.stubGlobal(
       "fetch",
-      vi
-        .fn()
-        .mockResolvedValue({
-          ok: true,
-          blob: async () => new Blob(["original"]),
-        }),
+      vi.fn().mockResolvedValue({
+        ok: true,
+        blob: async () => new Blob(["original"]),
+      }),
     );
     vi.stubGlobal("crypto", {
       randomUUID: () => "copy",
       subtle: { digest: async () => new ArrayBuffer(32) },
     });
     const hook = renderHook(() => useScooterDocuments([original]));
-    let generating!: Promise<void>;
+    let generating!: ReturnType<
+      typeof hook.result.current.generateClientCopies
+    >;
     act(() => {
       generating = hook.result.current.generateClientCopies();
     });
@@ -95,12 +184,10 @@ describe("client copy generation", () => {
     mocks.generate.mockRejectedValue(new Error("Export failed"));
     vi.stubGlobal(
       "fetch",
-      vi
-        .fn()
-        .mockResolvedValue({
-          ok: true,
-          blob: async () => new Blob(["original"]),
-        }),
+      vi.fn().mockResolvedValue({
+        ok: true,
+        blob: async () => new Blob(["original"]),
+      }),
     );
     const hook = renderHook(() => useScooterDocuments([original]));
     await act(async () => {

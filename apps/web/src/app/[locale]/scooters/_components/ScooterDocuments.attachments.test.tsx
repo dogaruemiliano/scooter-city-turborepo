@@ -7,6 +7,7 @@ import {
   Harness,
   pdf,
   mockBatchExtraction,
+  enterRegistration,
 } from "./ScooterDocuments.test-helpers";
 import { v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
@@ -155,9 +156,10 @@ describe("Scooter documents", () => {
       screen.getByLabelText("Browse files", { selector: "input" }),
       pdf("second.pdf"),
     );
-    await waitFor(() =>
-      expect(screen.getByLabelText("Plate number")).toHaveValue("14949"),
-    );
+    await screen.findByText(messages.en.scooters.creation.manualRegistration);
+    expect(screen.queryByLabelText("Plate number")).toBeNull();
+    await enterRegistration(browser);
+    expect(screen.getByLabelText("Plate number")).toHaveValue("14949");
     expect(screen.getByLabelText("Color")).toHaveValue("Blue");
     expect(
       mocks.api.mock.calls.filter(

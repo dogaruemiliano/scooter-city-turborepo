@@ -1,14 +1,144 @@
 // Register the shared mocks before importing components under test.
-import { mocks, brands, renderWizard } from "./ScooterCreateForm.test.fixtures";
+import {
+  mocks,
+  brands,
+  renderWizard,
+  createdScooter,
+  chooseSelectOption,
+} from "./ScooterCreateForm.test.fixtures";
 import { v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { scooterEditorDefaults } from "./scooter-editor-schema";
 import { expect, it, vi } from "vitest";
 import { ScooterEditor } from "./ScooterEditor";
 import type { ScooterImportSnapshot } from "./scooter-import-workspace";
+
+it("requires manual registration and plate entry for a classified certificate, ignoring old AI readings", async () => {
+  const data = {
+    vin: null,
+    fields: { registrationType: "local", registrationNumber: "AI PLATE" },
+    rawFields: {},
+  };
+  const state: ScooterImportSnapshot = {
+    version: 1,
+    values: {
+      ...scooterEditorDefaults(),
+      vin: createdScooter.vin,
+      brandId: brands[0]!.id,
+      model: "Manual model",
+      powertrainType: "electric",
+      registrationType: "unregistered",
+    },
+    documents: {
+      drafts: [
+        {
+          id: "registration",
+          type: "registration_certificate",
+          file: {
+            name: "registration.pdf",
+            type: "application/pdf",
+            size: 100,
+            lastModified: 1,
+          },
+          status: "ready",
+          uploadToken: "registration-token",
+        },
+      ],
+      extractions: {},
+      removedIds: [],
+    },
+    analysis: {
+      entries: {
+        registration: {
+          status: "success",
+          analysis: {
+            sourceId: "registration",
+            documentType: "registration_certificate",
+            extractedData: data,
+            issues: [],
+            reviewRequired: true,
+          },
+        },
+      },
+      cache: [
+        [
+          JSON.stringify([
+            "registration",
+            "registration_certificate",
+            "registration.pdf",
+            100,
+            1,
+          ]),
+          "registration",
+        ],
+      ],
+      attempts: [],
+    },
+    extraction: {
+      origins: [],
+      manual: [],
+      confirmedSources: [],
+      automaticBaselines: [],
+      rawBySource: [],
+    },
+    importedRawFields: null,
+    importedSignature: null,
+    automaticImport: "",
+    reviewedDocuments: [],
+    createdBrands: [],
+    status: "review",
+  };
+  mocks.apiFetch.mockResolvedValue(createdScooter);
+  render(
+    <NextIntlClientProvider locale="en" messages={messages.en}>
+      <ScooterEditor
+        brands={brands}
+        returnHref="/en/scooters"
+        initialSnapshot={state}
+      />
+    </NextIntlClientProvider>,
+  );
+  const browser = userEvent.setup();
+  expect(
+    screen.getByText(messages.en.scooters.creation.manualRegistration),
+  ).toBeVisible();
+  expect(
+    screen.getByText(messages.en.scooters.documents.batch.identified),
+  ).toBeVisible();
+  expect(
+    screen.queryByText(messages.en.scooters.documents.batch.read),
+  ).toBeNull();
+  expect(screen.queryByRole("textbox", { name: "Plate number" })).toBeNull();
+  const submit = () =>
+    mocks.apiFetch.mock.calls.filter(
+      ([path]) => path === v1.scooters.ROUTES.create,
+    );
+  // Native form submission also exercises the Enter-key path.
+  fireEvent.submit(
+    screen.getByRole("button", { name: "Create scooter" }).closest("form")!,
+  );
+  await waitFor(() =>
+    expect(
+      screen.getByRole("combobox", { name: "Registration type" }),
+    ).toHaveAttribute("aria-invalid", "true"),
+  );
+  expect(submit()).toHaveLength(0);
+  await chooseSelectOption(browser, "Registration type", "Local");
+  const plate = screen.getByRole("textbox", { name: "Plate number" });
+  expect(plate).toHaveValue("");
+  await browser.click(screen.getByRole("button", { name: "Create scooter" }));
+  await waitFor(() => expect(plate).toHaveAttribute("aria-invalid", "true"));
+  expect(submit()).toHaveLength(0);
+  await browser.type(plate, "VL 18 167");
+  await browser.click(screen.getByRole("button", { name: "Create scooter" }));
+  await waitFor(() => expect(submit()).toHaveLength(1));
+  expect(submit()[0]?.[2]).toMatchObject({
+    json: { registrationType: "local", registrationNumber: "VL 18 167" },
+  });
+});
 
 it("restores manual field corrections from a persistent workspace draft after navigation", async () => {
   const draft = {

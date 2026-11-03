@@ -139,6 +139,9 @@ model User {
   otpChallenges           OtpChallenge[]
   authAccounts            AuthAccount[]
   auditEvents             AuditEvent[]
+  notifications           Notification[]
+  notificationPreference  NotificationPreference?
+  pushSubscriptions       NotificationPushSubscription[]
   avatarAssetId           String?                  @unique
   avatar                  MediaAsset?              @relation("UserAvatar", fields: [avatarAssetId], references: [id], onDelete: SetNull)
   mediaAssets             MediaAsset[]
@@ -618,6 +621,7 @@ model Session {
   lastUsedAt    DateTime       @default(now())
   revokedAt     DateTime?
   refreshTokens RefreshToken[]
+  pushSubscriptions NotificationPushSubscription[]
 
   @@index([userId, revokedAt])
 }
@@ -1912,6 +1916,7 @@ model UserInvitation {
 }
 
 model ScooterProblem {
+  notificationEvents NotificationEvent[]
   id              String                @id @default(cuid())
   /// Null identifies a general todo, accessible only to admins.
   scooterId       String?
@@ -1949,6 +1954,105 @@ model ScooterProblem {
   @@index([scooterId, status])
   @@index([assigneeId, status])
   @@index([status, assigneeId])
+}
+
+/// Immutable business payload with durable notification dispatch bookkeeping.
+model NotificationEvent {
+  id                   String          @id @default(cuid())
+  type                 String
+  version              Int             @default(1)
+  category             String
+  actorId              String?
+  actorName            String
+  subjectType          String
+  subjectId            String
+  subjectLabel         String
+  permissionKey        String
+  targetPath           String?
+  scooter              Json?
+  changes              String[]        @default([])
+  adminRecipientIds    String[]        @default([])
+  assignedRecipientIds String[]        @default([])
+  removedRecipientIds  String[]        @default([])
+  problemId            String?
+  problem              ScooterProblem? @relation(fields: [problemId], references: [id], onDelete: SetNull)
+  createdAt            DateTime        @default(now())
+  processedAt          DateTime?
+  attempts             Int             @default(0)
+  availableAt          DateTime        @default(now())
+  leaseId              String?
+  leaseUntil           DateTime?
+  lastError            String?
+  notifications        Notification[]
+
+  @@index([processedAt, availableAt, leaseUntil])
+  @@index([createdAt, id])
+  @@index([category, createdAt, id])
+  @@index([permissionKey, createdAt])
+  @@index([problemId])
+}
+
+model Notification {
+  id          String                 @id @default(cuid())
+  eventId     String
+  event       NotificationEvent      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  recipientId String
+  recipient   User                   @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  reason      String                 @default("activity")
+  createdAt   DateTime               @default(now())
+  readAt      DateTime?
+  presentedAt DateTime?
+  deliveries  NotificationDelivery[]
+
+  @@unique([eventId, recipientId])
+  @@index([recipientId, createdAt, id])
+  @@index([recipientId, readAt, presentedAt])
+}
+
+model NotificationPreference {
+  userId          String   @id
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pushEnabled     Boolean  @default(true)
+  mutedCategories String[] @default([])
+  updatedAt       DateTime @updatedAt
+}
+
+model NotificationPushSubscription {
+  id           String                 @id @default(cuid())
+  userId       String
+  user         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId    String
+  session      Session                @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  endpointHash String                 @unique
+  endpoint     String
+  p256dh       String
+  auth         String
+  locale       String                 @default("en")
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  revokedAt    DateTime?
+  deliveries   NotificationDelivery[]
+
+  @@index([userId, revokedAt])
+  @@index([sessionId])
+}
+
+model NotificationDelivery {
+  id             String                       @id @default(cuid())
+  notificationId String
+  notification   Notification                 @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  subscriptionId String
+  subscription   NotificationPushSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  status         String                       @default("pending")
+  availableAt    DateTime                     @default(now())
+  attempts       Int                          @default(0)
+  leaseId        String?
+  leaseUntil     DateTime?
+  lastError      String?
+  acceptedAt     DateTime?
+
+  @@unique([notificationId, subscriptionId])
+  @@index([status, availableAt, leaseUntil])
 }
 
 model BusinessLocation {

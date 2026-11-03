@@ -25,7 +25,9 @@ const evidence = (
 describe("inspection evidence confirmation", () => {
   const tx = {
     $queryRaw: jest.fn(),
-    scooter: { findUniqueOrThrow: jest.fn() },
+    scooter: { findUniqueOrThrow: jest.fn(), findUnique: jest.fn() },
+    user: { findMany: jest.fn(), findUnique: jest.fn() },
+    notificationEvent: { create: jest.fn() },
     scooterDocument: { findMany: jest.fn() },
     scooterItpInspection: {
       findUnique: jest.fn(),
@@ -43,6 +45,12 @@ describe("inspection evidence confirmation", () => {
     jest.clearAllMocks();
     tx.$queryRaw.mockResolvedValue([{ id: "scooter" }]);
     tx.scooter.findUniqueOrThrow.mockResolvedValue({ vin });
+    tx.scooter.findUnique.mockResolvedValue({
+      id: "scooter",
+      fleetNumber: 7,
+      brand: { code: "HON" },
+    });
+    tx.user.findMany.mockResolvedValue([]);
     tx.scooterDocument.findMany.mockResolvedValue([
       evidence("card", "itp_card"),
       evidence("certificate", "itp_certificate"),
@@ -64,6 +72,7 @@ describe("inspection evidence confirmation", () => {
     expect(record.validUntil).toBe("2027-01-01");
     expect(record.odometerKm).toBe(0);
     expect(tx.scooterItpInspection.create).toHaveBeenCalledTimes(1);
+    expect(tx.notificationEvent.create).toHaveBeenCalledTimes(1);
   });
   it("records reviewed manual validity without inventing an inspection date or requiring scans", async () => {
     const record = await service.create("scooter", {

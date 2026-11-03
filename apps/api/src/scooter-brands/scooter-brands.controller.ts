@@ -25,6 +25,8 @@ import { ScooterBrandList } from "./dto/scooter-brand-list";
 import { UpdateScooterBrandInput } from "./dto/update-scooter-brand.input";
 import { toScooterBrand } from "./scooter-brands.mapper";
 import { ScooterBrandsService } from "./scooter-brands.service";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import type { AuthPrincipal } from "../auth/auth.types";
 
 @ApiTags("scooter-brands")
 @ApiCookieAuth(v1.auth.ACCESS_TOKEN_COOKIE)
@@ -42,8 +44,9 @@ export class ScooterBrandsController {
   @ZodResponse({ status: HttpStatus.CREATED, type: ScooterBrand })
   async create(
     @Body() input: CreateScooterBrandInput,
+    @CurrentUser() user: AuthPrincipal,
   ): Promise<v1.scooterBrands.ScooterBrand> {
-    return toScooterBrand(await this.scooterBrands.create(input));
+    return toScooterBrand(await this.scooterBrands.create(input, user.id));
   }
 
   @RequireAllScope("scooter_brands.read")
@@ -68,8 +71,9 @@ export class ScooterBrandsController {
   async update(
     @Param("id") id: string,
     @Body() input: UpdateScooterBrandInput,
+    @CurrentUser() user: AuthPrincipal,
   ): Promise<v1.scooterBrands.ScooterBrand> {
-    return toScooterBrand(await this.scooterBrands.update(id, input));
+    return toScooterBrand(await this.scooterBrands.update(id, input, user.id));
   }
 
   @RequireAllScope("scooter_brands.manage")
@@ -79,7 +83,10 @@ export class ScooterBrandsController {
     operationId: "ScooterBrandsController_delete_v1",
     summary: "Delete a scooter brand",
   })
-  async delete(@Param("id") id: string): Promise<void> {
-    await this.scooterBrands.delete(id);
+  async delete(
+    @Param("id") id: string,
+    @CurrentUser() user: AuthPrincipal,
+  ): Promise<void> {
+    await this.scooterBrands.delete(id, user.id);
   }
 }

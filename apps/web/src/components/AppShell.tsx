@@ -66,6 +66,7 @@ import {
 } from "@repo/ui/components/sidebar";
 
 import { useLogout } from "./auth/LogoutButton";
+import { NotificationsBell } from "./notifications/NotificationsBell";
 import { useSession } from "./auth/SessionProvider";
 import { LanguageMenuSub } from "./LanguageSwitcher";
 import {
@@ -196,6 +197,7 @@ const ALL_NAVIGATION_HREFS: readonly string[] = [
 
 const PAGE_TITLES: Record<string, string> = {
   "/": "dashboard",
+  "/notifications": "notifications",
   "/account/settings": "accountSettings",
   "/finance": "finance",
   "/finance/expenses": "financeExpenses",
@@ -335,6 +337,7 @@ function AppShellContent({
             <span className="min-w-0 flex-1 truncate text-sm font-semibold">
               {pageTitle}
             </span>
+            <NotificationsBell />
             <div
               ref={setPageHeaderActionsTarget}
               className="ml-auto flex shrink-0 gap-2 md:hidden"
@@ -357,9 +360,16 @@ function AppShellContent({
             ref={pageScrollRef}
             data-slot="app-page-scroll"
             onScroll={onPageScroll}
-            className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-y-contain pb-[calc(var(--spacing-screen-bottom)+env(safe-area-inset-bottom))] md:overflow-visible md:overscroll-auto"
+            className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-y-contain md:overflow-visible md:overscroll-auto"
           >
-            {children}
+            {/* Padding on the scrollport adds to bottom-sticky offsets. Keep it
+                in the scrolling content so floating actions count safe areas once. */}
+            <div
+              data-slot="app-page-content"
+              className="flex min-w-0 flex-1 flex-col pb-[calc(var(--spacing-screen-bottom)+env(safe-area-inset-bottom))]"
+            >
+              {children}
+            </div>
           </div>
         </SidebarInset>
       </PageHeaderActionsContext.Provider>

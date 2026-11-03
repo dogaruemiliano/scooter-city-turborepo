@@ -1,3 +1,4 @@
+import { v1 } from "@repo/api-shared";
 import type { Env } from "../config/env";
 import { createScooterDocumentExtractionProvider } from "./scooter-document-extraction.module";
 import { ScooterDocumentExtractionService } from "./scooter-document-extraction.service";
@@ -51,6 +52,11 @@ describe("scooter extraction provider selection", () => {
         contentType: "image/png",
       });
       expect(result.extractedData.vin).toBeNull();
+      if (!v1.scooters.scooterDocumentExtractsData(documentType)) {
+        expect(result.extractedData.fields).toEqual({});
+        expect(result.extractedData.rawFields).toEqual({});
+        return;
+      }
       expect(Object.values(result.extractedData.fields)).toContain(
         "TEST FIXTURE",
       );

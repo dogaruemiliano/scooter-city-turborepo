@@ -4,6 +4,9 @@ import {
   CheckIcon,
   CreditCardIcon,
   LogOutIcon,
+  EllipsisVerticalIcon,
+  FileIcon,
+  RotateCcwIcon,
   SettingsIcon,
   UserRoundIcon,
 } from "lucide-react";
@@ -34,6 +37,55 @@ const meta = {
 
 export default meta;
 type Story = StoryObj<typeof meta>;
+
+/** Content determines width; caps are 90vw below sm, 80vw at sm, and 384px from md. */
+export const ContentSized: Story = {
+  args: { defaultOpen: true },
+  render: (args) => (
+    <DropdownMenu {...args}>
+      <DropdownMenuTrigger
+        render={
+          <Button variant="outline" size="icon" aria-label="More actions" />
+        }
+      >
+        <EllipsisVerticalIcon aria-hidden="true" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" aria-label="More actions">
+        <DropdownMenuItem>
+          <RotateCcwIcon aria-hidden="true" />
+          Reopen problem
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  ),
+};
+
+/** Long labels wrap within the responsive cap, including unbroken identifiers. */
+export const LongContent: Story = {
+  args: { defaultOpen: true },
+  render: (args) => (
+    <DropdownMenu {...args}>
+      <DropdownMenuTrigger
+        render={
+          <Button variant="outline" size="icon" aria-label="More actions" />
+        }
+      >
+        <EllipsisVerticalIcon aria-hidden="true" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" aria-label="More actions">
+        <DropdownMenuItem>
+          <RotateCcwIcon aria-hidden="true" />
+          Reopen this completed problem and notify everyone assigned to the
+          scooter
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <FileIcon aria-hidden="true" />
+          scooter_inspection_attachment_with_a_very_long_unbroken_identifier.pdf
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  ),
+};
 
 export const Default: Story = {
   render: () => (

@@ -167,8 +167,9 @@ export class FinanceController {
   updateBook(
     @Param("bookId") bookId: string,
     @Body() input: UpdateFinanceBookInput,
+    @CurrentUser() user: AuthPrincipal,
   ): Promise<v1.finance.FinanceBook> {
-    return this.books.update(bookId, input);
+    return this.books.update(bookId, input, user.id);
   }
 
   @RequireSuperAdmin()
@@ -191,8 +192,9 @@ export class FinanceController {
   @ZodResponse({ type: FinanceLegalIdentity })
   upsertCompanyIdentity(
     @Body() input: UpsertFinanceLegalIdentityInput,
+    @CurrentUser() user: AuthPrincipal,
   ): Promise<v1.finance.FinanceLegalIdentity> {
-    return this.companyIdentity.upsert(input);
+    return this.companyIdentity.upsert(input, user.id);
   }
 
   @RequireSuperAdmin()
@@ -215,8 +217,9 @@ export class FinanceController {
   @ZodResponse({ type: CompanyAssociates })
   updateCompanyAssociates(
     @Body() input: UpdateCompanyAssociatesInput,
+    @CurrentUser() user: AuthPrincipal,
   ): Promise<v1.finance.CompanyAssociates> {
-    return this.companyAssociates.update(input);
+    return this.companyAssociates.update(input, user.id);
   }
 
   @RequireAllScope("finance.suppliers.read")
@@ -241,8 +244,9 @@ export class FinanceController {
   @ZodResponse({ status: HttpStatus.CREATED, type: Supplier })
   createSupplier(
     @Body() input: CreateSupplierInput,
+    @CurrentUser() user: AuthPrincipal,
   ): Promise<v1.finance.Supplier> {
-    return this.suppliers.create(input);
+    return this.suppliers.create(input, user.id);
   }
 
   @RequireAllScope("finance.suppliers.manage")
@@ -255,8 +259,9 @@ export class FinanceController {
   updateSupplier(
     @Param("supplierId") supplierId: string,
     @Body() input: UpdateSupplierInput,
+    @CurrentUser() user: AuthPrincipal,
   ): Promise<v1.finance.Supplier> {
-    return this.suppliers.update(supplierId, input);
+    return this.suppliers.update(supplierId, input, user.id);
   }
 
   @RequireAllScope("finance.accounts.read")

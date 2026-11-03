@@ -38,20 +38,24 @@ export class SuppliersService {
 
   async create(
     input: v1.finance.CreateSupplierInput,
+    actorId?: string,
   ): Promise<v1.finance.Supplier> {
     const normalized = normalizeSupplier(input.name, input.taxIdentifier);
 
     try {
       return toSupplier(
-        await this.repository.createSupplier({
-          name: input.name,
-          normalizedName: normalized.name,
-          taxIdentifier: input.taxIdentifier,
-          normalizedTaxIdentifier: normalized.taxIdentifier,
-          isVatPayer: supplierTaxIdentifierHasCountryPrefix(
-            input.taxIdentifier,
-          ),
-        }),
+        await this.repository.createSupplier(
+          {
+            name: input.name,
+            normalizedName: normalized.name,
+            taxIdentifier: input.taxIdentifier,
+            normalizedTaxIdentifier: normalized.taxIdentifier,
+            isVatPayer: supplierTaxIdentifierHasCountryPrefix(
+              input.taxIdentifier,
+            ),
+          },
+          actorId,
+        ),
       );
     } catch (error) {
       if (isUniqueConstraintViolation(error)) {
@@ -77,6 +81,7 @@ export class SuppliersService {
   async update(
     supplierId: string,
     input: v1.finance.UpdateSupplierInput,
+    actorId?: string,
   ): Promise<v1.finance.Supplier> {
     const current = await this.repository.findSupplierById(supplierId);
     if (!current) {
@@ -91,14 +96,20 @@ export class SuppliersService {
 
     try {
       return toSupplier(
-        await this.repository.updateSupplier(supplierId, {
-          name,
-          normalizedName: normalized.name,
-          taxIdentifier,
-          normalizedTaxIdentifier: normalized.taxIdentifier,
-          isVatPayer: supplierTaxIdentifierHasCountryPrefix(taxIdentifier),
-          ...(input.isActive === undefined ? {} : { isActive: input.isActive }),
-        }),
+        await this.repository.updateSupplier(
+          supplierId,
+          {
+            name,
+            normalizedName: normalized.name,
+            taxIdentifier,
+            normalizedTaxIdentifier: normalized.taxIdentifier,
+            isVatPayer: supplierTaxIdentifierHasCountryPrefix(taxIdentifier),
+            ...(input.isActive === undefined
+              ? {}
+              : { isActive: input.isActive }),
+          },
+          actorId,
+        ),
       );
     } catch (error) {
       this.handleWriteError(error);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useOptionalSession } from "@/components/auth/SessionProvider";
+import { useWorkspaceNotifications } from "@/components/WorkspaceNotifications";
 import { canAccess } from "@/lib/access";
 import { v1 } from "@repo/api-shared";
 import {
@@ -80,6 +81,7 @@ export function ScooterBatchDocuments({
   itpValidUntil?: string | null;
 }) {
   const t = useTranslations("scooters.documents");
+  const notifications = useWorkspaceNotifications();
   const user = useOptionalSession()?.user;
   const canWrite = canAccess(user, "scooter_documents.write");
   const canRead = canAccess(user, "scooter_documents.read");
@@ -181,7 +183,9 @@ export function ScooterBatchDocuments({
   );
   useEffect(() => {
     const added = documents.drafts.some(
-      (draft) => !previousDraftIds.current.has(draft.id),
+      (draft) =>
+        draft.version !== "client_copy" &&
+        !previousDraftIds.current.has(draft.id),
     );
     previousDraftIds.current = new Set(
       documents.drafts.map((draft) => draft.id),
@@ -262,7 +266,9 @@ export function ScooterBatchDocuments({
         </div>
       </CardHeader>
       <CardContent className="grid min-w-0 gap-4">
-        {documents.canGenerateClientCopies && canWrite ? (
+        {(documents.canGenerateClientCopies ||
+          documents.generatingClientCopies) &&
+        canWrite ? (
           <SaveButton
             className="justify-self-start"
             type="button"
@@ -273,8 +279,17 @@ export function ScooterBatchDocuments({
             idleLabel={t("generateClientCopies")}
             pendingLabel={t("generatingClientCopies")}
             successLabel={t("clientCopiesGenerated")}
-            onClick={() => {
-              void documents.generateClientCopies();
+            onClick={async () => {
+              const generated = await documents.generateClientCopies();
+              if (generated === undefined) return;
+              notifications?.add({
+                title: t(
+                  generated
+                    ? "clientCopiesGenerated"
+                    : "generateClientCopiesError",
+                ),
+                variant: generated ? "success" : "error",
+              });
             }}
           />
         ) : null}
@@ -426,7 +441,7 @@ export function ScooterBatchDocuments({
             {t("batch.manualTypes")}
           </p>
         ) : null}
-        {documents.clientCopyError ? (
+        {documents.clientCopyError && !notifications ? (
           <p role="alert" className="text-sm text-destructive">
             {t("generateClientCopiesError")}
           </p>
@@ -592,7 +607,16 @@ function BatchDocumentRow({
             : draft.version === "client_copy"
               ? t("batch.uploaded")
               : state?.status === "success"
-                ? t("batch.read")
+                ? t(
+                    (state.analysis.extractedData.documents?.some((document) =>
+                      v1.scooters.scooterDocumentExtractsData(
+                        document.documentType,
+                      ),
+                    ) ??
+                      v1.scooters.scooterDocumentExtractsData(draft.type ?? ""))
+                      ? "batch.read"
+                      : "batch.identified",
+                  )
                 : canExtract
                   ? extractionT("queued")
                   : t("batch.manualTypes");

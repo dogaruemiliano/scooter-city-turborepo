@@ -83,9 +83,9 @@ describe("analysis suggestions through the shared import pipeline", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.values.color).toBeUndefined();
-    expect(result.values.registrationCertificateNumber).toBe("CERT-42");
+    expect(result.values.registrationCertificateNumber).toBeUndefined();
     expect(result.extractedDocuments).not.toHaveProperty(civ.sourceId);
-    expect(result.needsVinReview).toBeUndefined();
+    expect(result.needsVinReview).toBe(true);
   });
 
   it("selects the CIV VIN and preserves conflicting source readings for review", () => {
@@ -101,9 +101,11 @@ describe("analysis suggestions through the shared import pipeline", () => {
     );
     expect(result).toMatchObject({ ok: true, values: { vin } });
     if (result.ok)
-      expect(result.extractedDocuments?.[importer.sourceId].vin).toBe(
-        "LXYTCKP05P0000002",
-      );
+      expect(result.extractedDocuments?.[importer.sourceId]).toMatchObject({
+        vin: null,
+        fields: {},
+        rawFields: {},
+      });
   });
 
   it("does not request another VIN when the CIV already supplies it", () => {
@@ -235,7 +237,7 @@ it("imports CIV and insurance children from one PDF while retaining one physical
   expect(
     result.extractedDocuments?.[source.sourceId]?.documents?.[2]?.fields
       .foreignRegistrationNumber,
-  ).toBe("AB-123-C");
+  ).toBeUndefined();
 });
 
 it("fills the priority VIN while retaining mismatched logical readings within one PDF", () => {
@@ -269,7 +271,14 @@ it("fills the priority VIN while retaining mismatched logical readings within on
   ).toMatchObject({
     ok: true,
     values: { vin },
-    extractedDocuments: { civ: { documents: mixed.extractedData.documents } },
+    extractedDocuments: {
+      civ: {
+        documents: [
+          mixed.extractedData.documents[0],
+          { ...mixed.extractedData.documents[1], vin: null },
+        ],
+      },
+    },
   });
 });
 
@@ -362,9 +371,10 @@ it("does not reapply CIV-only values after a document type is corrected to owner
   );
   expect(result).toMatchObject({
     ok: true,
-    values: { model: "Printed model" },
+    values: {},
   });
   if (result.ok) {
+    expect(result.values).not.toHaveProperty("model");
     expect(result.values).not.toHaveProperty("civNumber");
     expect(result.unresolved).not.toContain("civIssuedAt");
   }

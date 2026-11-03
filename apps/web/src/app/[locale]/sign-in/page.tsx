@@ -2,6 +2,8 @@ import { PageLayout } from "@repo/ui/components/page-layout";
 import { v1 } from "@repo/api-shared";
 import { messages } from "@repo/i18n";
 import type { Metadata } from "next";
+import Image from "next/image";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { LanguageSwitcher } from "../../../components/LanguageSwitcher";
@@ -13,6 +15,10 @@ import {
 } from "../../../i18n/paths";
 import { webApi } from "../../../lib/api";
 import { meOnServer } from "../../../lib/auth-server";
+import {
+  resolveThemePreference,
+  THEME_COOKIE_NAME,
+} from "../../../lib/theme-cookie";
 
 interface SignInPageProps {
   params: Promise<{ locale: string }>;
@@ -50,6 +56,10 @@ export default async function SignInPage({
   const { methods } = await loadEnabledMethods();
 
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+  const cookieStore = await cookies();
+  const theme = resolveThemePreference(
+    cookieStore.get(THEME_COOKIE_NAME)?.value,
+  );
 
   return (
     <PageLayout
@@ -60,6 +70,26 @@ export default async function SignInPage({
       <LanguageSwitcher className="absolute top-4 right-4 z-raised sm:top-6 sm:right-6" />
 
       <div className="flex w-full max-w-md flex-col gap-6">
+        <picture className="mx-auto block w-64 max-w-full sm:w-72">
+          <source
+            media={
+              theme === "system"
+                ? "(prefers-color-scheme: dark)"
+                : theme === "dark"
+                  ? "all"
+                  : "not all"
+            }
+            srcSet="/logo/scooter-city-logo-horizontal-light.svg"
+          />
+          <Image
+            src="/logo/scooter-city-logo-horizontal-dark.svg"
+            alt="Scooter City"
+            width={677}
+            height={83}
+            className="h-auto w-full"
+            unoptimized
+          />
+        </picture>
         <SignInMethods
           enabledMethods={methods}
           googleClientId={googleClientId}

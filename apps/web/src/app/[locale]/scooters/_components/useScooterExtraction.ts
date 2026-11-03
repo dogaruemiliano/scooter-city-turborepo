@@ -89,7 +89,17 @@ function blankResult(): Success {
 function initialEvidence(documents: ScooterDocumentsEditor) {
   return Object.fromEntries(
     documents.existing.flatMap((doc) =>
-      doc.extractedData ? [[doc.id, doc.extractedData]] : [],
+      doc.extractedData
+        ? [
+            [
+              doc.id,
+              v1.scooters.scooterDocumentExtractionForType(
+                doc.type,
+                doc.extractedData,
+              ),
+            ],
+          ]
+        : [],
     ),
   );
 }
@@ -123,9 +133,18 @@ export function useScooterExtraction(options: Options) {
   >(() => ({
     ...initialEvidence(documents),
     ...Object.fromEntries(
-      Object.entries(documents.extractions).filter(
-        (entry): entry is [string, ExtractedDocumentData] => entry[1] !== null,
-      ),
+      Object.entries(documents.extractions)
+        .filter(
+          (entry): entry is [string, ExtractedDocumentData] =>
+            entry[1] !== null,
+        )
+        .map(([id, data]) => [
+          id,
+          v1.scooters.scooterDocumentExtractionForType(
+            sources.find((source) => source.sourceId === id)?.type ?? "",
+            data,
+          ),
+        ]),
     ),
   }));
   const [reviewResult, setReviewResult] = useState<Success | undefined>(

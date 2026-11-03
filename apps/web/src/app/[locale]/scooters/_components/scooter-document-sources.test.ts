@@ -82,7 +82,7 @@ describe("source-aware extraction", () => {
     }
   });
 
-  it("uses CIV exclusively for technical data, certificate for registration, and links insurance by its source", () => {
+  it("uses CIV for technical data, leaves registration manual, and links insurance by its source", () => {
     const result = parse([
       document(
         sources[0]!,
@@ -101,7 +101,6 @@ describe("source-aware extraction", () => {
       ),
       document(sources[2]!, {
         registrationType: "local",
-        registrationNumber: "14947",
       }),
       document(
         sources[3]!,
@@ -123,7 +122,6 @@ describe("source-aware extraction", () => {
         brandId: "brand-1",
         powerKw: "2.68",
         maxSpeedKmh: "25",
-        registrationNumber: "14947",
       },
       unresolved: ["engineCode"],
       rawFields: { "P.2": "2,68" },
@@ -133,21 +131,21 @@ describe("source-aware extraction", () => {
       fieldSources: {
         powerKw: ["civ-1"],
         brandId: ["civ-1"],
-        registrationNumber: ["registration-1"],
         "insurancePolicies.0.insuredName": ["insurance-1"],
       },
       extractedDocuments: {
-        "import-1": { rawFields: { Power: "5" } },
+        "import-1": { vin: null, fields: {}, rawFields: {} },
         "civ-1": { rawFields: { "13": null } },
       },
     });
     if (!result.ok) throw new Error("Expected valid import");
+    expect(result.values).not.toHaveProperty("registrationNumber");
     expect(result.values).not.toHaveProperty("requiredLicenseCategory");
     expect(result.values).not.toHaveProperty("color");
     expect(result.values).not.toHaveProperty("engineCode");
   });
 
-  it("imports foreign technical data without manufacturing any CIV metadata or Romanian registration", () => {
+  it("ignores historical foreign readings, including raw text and vehicle identifiers", () => {
     const result = parse(
       [
         document(
@@ -160,9 +158,9 @@ describe("source-aware extraction", () => {
     );
     expect(result).toMatchObject({
       ok: true,
-      values: { vin, brandId: "brand-1", powerKw: "2.5" },
+      values: {},
       extractedDocuments: {
-        "import-1": { rawFields: { foreignPlate: "AB-123" } },
+        "import-1": { vin: null, fields: {}, rawFields: {} },
       },
     });
     if (!result.ok) throw new Error("Expected valid import");
@@ -180,7 +178,7 @@ describe("source-aware extraction", () => {
     ]) {
       expect(
         parse([document(sources[0]!, { [field]: "bad" })], [sources[0]!]),
-      ).toMatchObject({ ok: false, reason: "invalidFields" });
+      ).toMatchObject({ ok: true, values: {} });
     }
   });
 
@@ -207,8 +205,8 @@ describe("source-aware extraction", () => {
     });
   });
 
-  it("checks import VINs alongside CIV while retaining strict per-file assertions", () => {
-    const attached = sources.slice(0, 2);
+  it("checks independent CIV VINs while retaining strict per-file assertions", () => {
+    const attached = [{ ...sources[0]!, type: "civ" as const }, sources[1]!];
     expect(
       parse(
         [
@@ -305,9 +303,10 @@ describe("source-aware extraction", () => {
     ).toMatchObject({ ok: false, reason: "vinMismatch" });
   });
 
-  it("merges multiple import pages conservatively and preserves unresolved raw rubrics for document review", () => {
+  it("merges multiple CIV pages conservatively and preserves unresolved raw rubrics for document review", () => {
+    const first: DocumentSource = { ...sources[0]!, type: "civ" };
     const second: DocumentSource = {
-      ...sources[0]!,
+      ...first,
       sourceId: "import-2",
       fileName: "back.jpg",
     };
@@ -315,13 +314,13 @@ describe("source-aware extraction", () => {
       parse(
         [
           document(
-            sources[0]!,
+            first,
             { powerKw: 2, seatsCount: 0, maxTrainMassKg: "-" },
             { unreadable: null },
           ),
           document(second, { powerKw: 3, color: "Red" }),
         ],
-        [sources[0]!, second],
+        [first, second],
       ),
     ).toMatchObject({
       ok: true,
@@ -425,7 +424,9 @@ describe("source-aware extraction", () => {
 
   it("keeps document evidence separate without operational extraction fields or obsolete envelopes", () => {
     const prompt = documentExtractionPrompt(false, (field) => field, sources);
-    expect(prompt).toContain("VIN-ul pe celelalte documente separat");
+    expect(prompt).toContain(
+      "VIN-ul doar pe CIV, asigurare și certificatul ITP A4 separat",
+    );
     expect(prompt).toContain("nu copia VIN-ul între documente");
     expect(prompt).toContain("VIN necitibil = null");
     expect(prompt).toContain(
@@ -450,7 +451,7 @@ describe("source-aware extraction", () => {
     const importPrompt = documentExtractionPrompt(false, (field) => field, [
       sources[0]!,
     ]);
-    expect(importPrompt).toContain("\npowerKw: ");
+    expect(importPrompt).not.toContain("\npowerKw: ");
     expect(importPrompt).not.toContain("CIV 2024/2016/1993=");
     expect(importPrompt).not.toContain("civNumber");
     expect(importPrompt).not.toContain("registrationNumber");
@@ -461,7 +462,7 @@ describe("source-aware extraction", () => {
       (field) => field,
       [sources[2]!],
     );
-    expect(certificatePrompt).toContain("\nregistrationNumber: ");
+    expect(certificatePrompt).not.toContain("\nregistrationNumber: ");
     expect(certificatePrompt).not.toContain("powerKw");
     expect(certificatePrompt).not.toContain("insuredName");
 

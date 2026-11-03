@@ -18,6 +18,13 @@ export function prepareScooterAnalysisImport(
     currentInsuranceSourceIds?: string[];
   },
 ): DocumentImportResult {
+  analyses = analyses.map((analysis) => ({
+    ...analysis,
+    extractedData: v1.scooters.scooterDocumentExtractionForType(
+      analysis.documentType,
+      analysis.extractedData,
+    ),
+  }));
   const selectedInsuranceIds =
     options?.currentInsuranceSourceIds ??
     (options?.currentInsuranceSourceId
@@ -68,6 +75,8 @@ export function prepareScooterAnalysisImport(
       const insurance = new Set<string>(v1.scooters.INSURANCE_FIELDS);
       const fields = Object.fromEntries(
         Object.entries(document.fields).filter(([field]) => {
+          if (!v1.scooters.scooterDocumentExtractsData(document.documentType))
+            return false;
           if (document.documentType === "insurance")
             return insurance.has(field);
           if (
@@ -180,7 +189,11 @@ export function prepareScooterAnalysisImport(
       };
     softIssues.set(
       analysis.sourceId,
-      new Set(analysis.issues.map((issue) => issue.field)),
+      new Set(
+        v1.scooters.scooterDocumentExtractsData(analysis.documentType)
+          ? analysis.issues.map((issue) => issue.field)
+          : [],
+      ),
     );
   }
   function parse(): DocumentImportResult {

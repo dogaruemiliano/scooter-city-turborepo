@@ -4,6 +4,7 @@ import {
   ValidationPipe,
 } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
+import { SchedulerRegistry } from "@nestjs/schedule";
 import type { Server } from "node:http";
 import request from "supertest";
 
@@ -34,6 +35,13 @@ describe("healthz (e2e)", () => {
 
   afterAll(async () => {
     await app.close();
+  });
+
+  it("keeps scheduled workers out of HTTP test fixtures and teardown", () => {
+    const scheduler = app.get(SchedulerRegistry);
+    expect(scheduler.getCronJobs().size).toBe(0);
+    expect(scheduler.getIntervals()).toEqual([]);
+    expect(scheduler.getTimeouts()).toEqual([]);
   });
 
   it("GET /healthz → 200 with status:ok", async () => {

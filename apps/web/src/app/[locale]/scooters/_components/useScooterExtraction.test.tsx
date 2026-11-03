@@ -188,23 +188,16 @@ describe("document extraction lifecycle", () => {
     expect(hook.result.current.extraction.sources).toEqual([]);
     expect(hook.result.current.form.getValues("color")).toBe("Corrected");
   });
-  it("reviews every source VIN even when a CIV is present", () => {
+  it("only reviews extractable source VINs even when import papers are attached", () => {
     const hook = setup({ attached: [importer] });
-    expect(hook.result.current.extraction.unverifiedSources).toEqual([
-      importer,
-    ]);
+    expect(hook.result.current.extraction.unverifiedSources).toEqual([]);
     hook.rerender({ attached: [importer, civ] });
-    expect(hook.result.current.extraction.unverifiedSources).toEqual([
-      importer,
-      civ,
-    ]);
+    expect(hook.result.current.extraction.unverifiedSources).toEqual([civ]);
     hook.rerender({ attached: [importer] });
-    expect(hook.result.current.extraction.unverifiedSources).toEqual([
-      importer,
-    ]);
+    expect(hook.result.current.extraction.unverifiedSources).toEqual([]);
   });
 
-  it("requires review when historical import and CIV VINs conflict", () => {
+  it("ignores historical import VINs when reviewing the CIV", () => {
     const hook = setup({
       attached: [importer, civ],
       existing: true,
@@ -214,7 +207,7 @@ describe("document extraction lifecycle", () => {
         [civ.sourceId]: extracted({}, {}, vin),
       },
     });
-    expect(hook.result.current.extraction.vinMismatch).toBe(true);
+    expect(hook.result.current.extraction.vinMismatch).toBe(false);
   });
 
   it("does not dirty a persisted edit on mount or require reviewing historical files without extraction", () => {
@@ -284,9 +277,9 @@ describe("document extraction lifecycle", () => {
   });
 
   it("clears replaced automatic values but preserves manual changes and flags conflicts", () => {
-    const hook = setup({ attached: [importer] });
+    const hook = setup({ attached: [civ] });
     hook.apply({
-      [importer.sourceId]: extracted({
+      [civ.sourceId]: extracted({
         powertrainType: "combustion",
         powerKw: 2,
         color: "Blue",
@@ -297,8 +290,8 @@ describe("document extraction lifecycle", () => {
       hook.result.current.form.setValue("powerKw", "3", { shouldDirty: true }),
     );
     const replacement = {
-      ...importer,
-      sourceId: "import-2",
+      ...civ,
+      sourceId: "civ-2",
       fileName: "new.pdf",
     };
     hook.rerender({ attached: [replacement] });
@@ -308,7 +301,7 @@ describe("document extraction lifecycle", () => {
       hook.result.current.extraction.unverifiedSources.map(
         (source) => source.sourceId,
       ),
-    ).toEqual(["import-2"]);
+    ).toEqual(["civ-2"]);
     hook.apply({
       [replacement.sourceId]: extracted({
         powertrainType: "combustion",
@@ -323,7 +316,7 @@ describe("document extraction lifecycle", () => {
     ).toContain("powerKw");
   });
 
-  it("suppresses import values as soon as CIV is attached and restores them if CIV is removed", () => {
+  it("never reapplies historical import readings when CIV is attached or removed", () => {
     const hook = setup({ attached: [importer] });
     const importData = extracted({
       powertrainType: "combustion",
@@ -331,34 +324,21 @@ describe("document extraction lifecycle", () => {
       color: "Blue",
     });
     hook.apply({ [importer.sourceId]: importData });
+    expect(hook.result.current.form.getValues("powerKw")).toBe("");
     act(() =>
       hook.result.current.form.setValue("color", "Purple", {
         shouldDirty: true,
       }),
     );
     hook.rerender({ attached: [importer, civ] });
+    hook.apply({
+      [importer.sourceId]: importData,
+      [civ.sourceId]: extracted({ powertrainType: "combustion", powerKw: 1 }),
+    });
+    expect(hook.result.current.form.getValues("powerKw")).toBe("1");
+    hook.rerender({ attached: [importer] });
     expect(hook.result.current.form.getValues("powerKw")).toBe("");
     expect(hook.result.current.form.getValues("color")).toBe("Purple");
-    const civData = extracted(
-      {
-        powertrainType: "combustion",
-        powerKw: 1,
-        color: "White",
-        civVersion: "2024",
-      },
-      { "P.2": "1" },
-    );
-    hook.apply({ [importer.sourceId]: importData, [civ.sourceId]: civData });
-    expect(hook.result.current.form.getValues("powerKw")).toBe("1");
-    expect(hook.result.current.form.getValues("color")).toBe("Purple");
-    hook.rerender({ attached: [importer] });
-    expect(hook.result.current.form.getValues("powerKw")).toBe("2");
-    expect(hook.result.current.form.getValues("color")).toBe("Purple");
-    expect(hook.result.current.form.getValues("civVersion")).toBe("unknown");
-    expect(hook.onRawFields).toHaveBeenLastCalledWith({});
-    // An undo restores the original CIV extraction and its precedence.
-    hook.rerender({ attached: [importer, civ] });
-    expect(hook.result.current.form.getValues("powerKw")).toBe("1");
   });
 
   it("replays after clearing to a non-default automatic baseline and keeps historical confirmation on undo", () => {
@@ -376,7 +356,7 @@ describe("document extraction lifecycle", () => {
     });
     expect(hook.result.current.form.getValues("powerKw")).toBe("1");
     hook.rerender({ attached: [importer] });
-    expect(hook.result.current.form.getValues("powerKw")).toBe("2");
+    expect(hook.result.current.form.getValues("powerKw")).toBe("5");
     const saved = setup({ attached: [civ], existing: true, editing: true });
     saved.rerender({ attached: [], existing: true, editing: true });
     saved.rerender({ attached: [civ], existing: true, editing: true });

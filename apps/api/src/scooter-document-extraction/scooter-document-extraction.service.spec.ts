@@ -42,6 +42,67 @@ function setup(
 }
 
 describe("scooter document extraction normalization", () => {
+  it.each(
+    v1.scooters.SCOOTER_DOCUMENT_TYPES.filter(
+      (type) => !v1.scooters.scooterDocumentExtractsData(type),
+    ),
+  )(
+    "retains %s classification and overlay metadata while discarding attempted extraction",
+    (type) => {
+      const { service } = setup();
+      const result = service.normalize(
+        type,
+        {
+          detectedDocumentType: type,
+          clientCopy: true,
+          vin: VIN,
+          fields: [
+            field("registrationNumber", "VL 18 167"),
+            field("powerKw", 3),
+          ],
+          rawFields: [{ key: "handwritten", value: "2027-09-24" }],
+          documents: [
+            {
+              documentType: type,
+              vin: VIN,
+              pages: [1],
+              regions: [],
+              fields: [field("registrationNumber", "VL 18 167")],
+              rawFields: [{ key: "handwritten", value: "2027-09-24" }],
+              inspections: [
+                {
+                  inspectionDate: "2025-09-24",
+                  validUntil: "2027-09-24",
+                  result: "passed",
+                  certificateNumber: "123",
+                  odometerKm: 42,
+                  rawFields: [],
+                },
+              ],
+            },
+          ],
+        },
+        1,
+      );
+      expect(result.extractedData).toMatchObject({
+        vin: null,
+        fields: {},
+        rawFields: {},
+        clientCopy: true,
+      });
+      expect(result.extractedData.documents?.[0]).toMatchObject({
+        documentType: type,
+        pages: [1],
+        vin: null,
+        fields: {},
+        rawFields: {},
+      });
+      expect(result.extractedData.documents?.[0]).not.toHaveProperty(
+        "inspections",
+      );
+      expect(result.issues).toEqual([]);
+    },
+  );
   it.each(v1.scooters.SCOOTER_DOCUMENT_TYPES)(
     "detects %s before applying its field authority",
     (type) => {
@@ -449,7 +510,7 @@ describe("scooter document extraction normalization", () => {
     });
   });
 
-  it("keeps import facts separate from CIV metadata and current registration", async () => {
+  it("discards all data from import documents after classification", async () => {
     const { service } = setup(
       [
         field("brandName", "AGM"),
@@ -462,17 +523,12 @@ describe("scooter document extraction normalization", () => {
       ...input,
       documentType: "import_document",
     });
-    expect(result.extractedData.fields).toEqual({
-      brandName: "AGM",
-      vin: VIN,
-      powertrainType: null,
+    expect(result.extractedData).toEqual({
+      vin: null,
+      fields: {},
+      rawFields: {},
     });
-    expect(result.issues).toEqual(
-      expect.arrayContaining([
-        { field: "civNumber", code: "invalidValue" },
-        { field: "registrationNumber", code: "invalidValue" },
-      ]),
-    );
+    expect(result.issues).toEqual([]);
   });
 
   it("does not include technical facts or operation data in insurance results", async () => {
@@ -545,7 +601,7 @@ describe("scooter document extraction normalization", () => {
     });
   });
 
-  it("validates registration plates and preserves the certificate number separately", async () => {
+  it("leaves registration plates and certificate details for manual entry", async () => {
     const { service } = setup(
       [
         field("registrationType", "national"),
@@ -559,12 +615,12 @@ describe("scooter document extraction normalization", () => {
       ...input,
       documentType: "registration_certificate",
     });
-    expect(result.extractedData.fields).toMatchObject({
-      registrationType: "national",
-      registrationNumber: null,
-      registrationCertificateNumber: "SERIAL-001",
-      temporaryRegistrationExpiresAt: null,
+    expect(result.extractedData).toEqual({
+      vin: null,
+      fields: {},
+      rawFields: {},
     });
+    expect(result.issues).toEqual([]);
   });
 
   it("never infers a licence category from engine displacement or power", async () => {
@@ -699,9 +755,6 @@ describe("mixed document PDFs", () => {
     expect(result.type).toBe("civ");
     expect(result.extractedData.fields).toMatchObject({
       powerKw: 4,
-      foreignRegistrationNumber: "D-123-AB",
-      foreignFirstRegistrationDate: "2018-03-12",
-      exportDate: "2024-08-20",
     });
     expect(result.extractedData.fields).not.toHaveProperty(
       "registrationNumber",
@@ -709,18 +762,24 @@ describe("mixed document PDFs", () => {
     expect(result.extractedData.documents).toHaveLength(3);
     expect(result.extractedData.documents?.[0]).toMatchObject({
       pages: [1, 2],
-      fields: { powerKw: 3 },
+      fields: {},
+      vin: null,
+      rawFields: {},
     });
-    expect(result.issues).toContainEqual({
+    expect(result.extractedData.fields).not.toHaveProperty(
+      "foreignRegistrationNumber",
+    );
+    expect(result.extractedData.fields).not.toHaveProperty("exportDate");
+    expect(result.issues).not.toContainEqual({
       field: "powerKw",
       code: "conflictingValues",
     });
   });
-  it("keeps conflicting facts separate while selecting the CIV VIN over foreign readings", () => {
+  it("keeps conflicting facts separate while selecting the CIV VIN over certificate readings", () => {
     const conflicted = normalize([
       document("civ", [field("powerKw", 4)]),
       document(
-        "foreign_registration",
+        "itp_certificate",
         [field("brandName", "OTHER")],
         [2],
         OTHER_VIN,
@@ -734,12 +793,7 @@ describe("mixed document PDFs", () => {
     });
     const uncertain = normalize([
       document("civ", [field("powerKw", 4)]),
-      document(
-        "foreign_registration",
-        [field("brandName", "OTHER")],
-        [2],
-        null,
-      ),
+      document("itp_certificate", [field("brandName", "OTHER")], [2], null),
     ]);
     expect(uncertain.extractedData.vin).toBe(VIN);
     expect(uncertain.extractedData.documents?.[0].vin).toBe(VIN);
@@ -763,10 +817,11 @@ describe("mixed document PDFs", () => {
       field: "civIssuedAt",
       code: "unreadable",
     });
-    expect(result.extractedData.documents?.[1].fields).toMatchObject({
-      registrationLocalityCode: "18",
-      registrationCounty: "VL",
-      registrationNumber: "VL 18 167",
+    expect(result.extractedData.documents?.[1]).toMatchObject({
+      documentType: "registration_certificate",
+      vin: null,
+      fields: {},
+      rawFields: {},
     });
     expect(result.extractedData.documents?.[0].regions?.[0].height).toBe(0.5);
   });
@@ -825,7 +880,7 @@ describe("mixed document PDFs", () => {
         rawFields: [],
         documents: [
           document("civ", [field("vin", VIN)]),
-          document("foreign_registration", [], [1], malformed),
+          document("itp_certificate", [], [1], malformed),
         ],
       };
       const result = service.normalize("civ", output, 1);
@@ -839,7 +894,7 @@ describe("mixed document PDFs", () => {
   it("normalizes each ITP row independently, preserves raw dates and never infers a missing expiry", () => {
     const result = normalize([
       {
-        ...document("itp_card", []),
+        ...document("itp_certificate", []),
         inspections: [
           {
             inspectionDate: "12.03.2024",

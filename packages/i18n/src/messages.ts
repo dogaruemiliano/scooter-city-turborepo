@@ -13,6 +13,7 @@ import { personsCatalog } from "./catalogs/persons";
 import { sharedCatalog } from "./catalogs/shared";
 import { scootersCatalog } from "./catalogs/scooters";
 import { themeCatalog } from "./catalogs/theme";
+import { notificationsCatalog } from "./catalogs/notifications";
 
 export type MessageTree = {
   readonly [key: string]: string | MessageTree;
@@ -22,6 +23,7 @@ export type MessageCatalogs = Readonly<Record<SupportedLocale, MessageTree>>;
 
 export const messages = {
   en: {
+    notifications: notificationsCatalog.en,
     contracts: contractsCatalog.en,
     access: accessCatalog.en,
     workspace: workspaceCatalog.en,
@@ -38,6 +40,7 @@ export const messages = {
     mobilePlatform: mobilePlatformCatalog.en,
   },
   ro: {
+    notifications: notificationsCatalog.ro,
     contracts: contractsCatalog.ro,
     access: accessCatalog.ro,
     workspace: workspaceCatalog.ro,

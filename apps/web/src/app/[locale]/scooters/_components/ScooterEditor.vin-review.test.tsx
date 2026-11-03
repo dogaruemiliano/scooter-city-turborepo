@@ -119,7 +119,7 @@ it.each(["en", "ro"] as const)(
           },
           {
             id: "foreign",
-            documentType: "foreign_registration",
+            documentType: "itp_certificate",
             pages: [2, 3],
             vin: misread,
             fields: { vin: misread },
@@ -141,7 +141,8 @@ it.each(["en", "ro"] as const)(
         vin: correct,
         brandId: brand.id,
         fleetNumber: "7",
-        registrationType: "unregistered",
+        registrationType: "local",
+        registrationNumber: "VL 18 167",
       },
       documents: { drafts: [], removedIds: [], extractions: {} },
       analysis: {
@@ -190,7 +191,7 @@ it.each(["en", "ro"] as const)(
     const warning = alert.closest('[role="alert"]') as HTMLElement;
     expect(within(warning).getByText("civ.pdf")).toBeInTheDocument();
     expect(
-      within(warning).getByText(t.documents.foreign_registration, {
+      within(warning).getByText(t.documents.itp_certificate, {
         exact: false,
       }),
     ).toBeInTheDocument();

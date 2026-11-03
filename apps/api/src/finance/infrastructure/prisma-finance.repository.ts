@@ -27,6 +27,7 @@ import type { PostingLine } from "../domain/posting-plan";
 import { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { provisionAssociateAccounts } from "./finance-book.provisioner";
+import { publishNotificationEvent } from "../../notifications/notification-events";
 
 /** Relations every operation response needs. */
 const OPERATION_INCLUDE = {
@@ -273,14 +274,30 @@ export class PrismaFinanceRepository {
     });
   }
 
-  createSupplier(input: {
-    name: string;
-    normalizedName: string;
-    taxIdentifier: string;
-    normalizedTaxIdentifier: string;
-    isVatPayer: boolean;
-  }) {
-    return this.prisma.supplier.create({ data: input });
+  createSupplier(
+    input: {
+      name: string;
+      normalizedName: string;
+      taxIdentifier: string;
+      normalizedTaxIdentifier: string;
+      isVatPayer: boolean;
+    },
+    actorId?: string,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const supplier = await tx.supplier.create({ data: input });
+      await publishNotificationEvent(tx, {
+        type: "supplier.created",
+        category: "other",
+        actorId,
+        subjectType: "supplier",
+        subjectId: supplier.id,
+        subjectLabel: supplier.name,
+        permissionKey: "finance.suppliers.read",
+        targetPath: "/finance/expenses",
+      });
+      return supplier;
+    });
   }
 
   updateSupplier(
@@ -293,10 +310,35 @@ export class PrismaFinanceRepository {
       isVatPayer?: boolean;
       isActive?: boolean;
     },
+    actorId?: string,
   ) {
-    return this.prisma.supplier.update({
-      where: { id: supplierId },
-      data: input,
+    return this.prisma.$transaction(async (tx) => {
+      const before = await tx.supplier.findUnique({
+        where: { id: supplierId },
+      });
+      const supplier = await tx.supplier.update({
+        where: { id: supplierId },
+        data: input,
+      });
+      const changes = Object.keys(input).filter(
+        (key) =>
+          !key.startsWith("normalized") &&
+          before?.[key as keyof typeof before] !==
+            supplier[key as keyof typeof supplier],
+      );
+      if (changes.length)
+        await publishNotificationEvent(tx, {
+          type: "supplier.updated",
+          category: "other",
+          actorId,
+          subjectType: "supplier",
+          subjectId: supplierId,
+          subjectLabel: supplier.name,
+          permissionKey: "finance.suppliers.read",
+          targetPath: "/finance/expenses",
+          changes,
+        });
+      return supplier;
     });
   }
 
@@ -335,9 +377,11 @@ export class PrismaFinanceRepository {
 
   updateCompanyAssociates(
     input: v1.finance.UpdateCompanyAssociatesInput,
+    actorId?: string,
   ): Promise<CompanyAssociatesRecord> {
     return this.prisma.$transaction(
       async (tx) => {
+        let businessChanged = false;
         const books = await tx.financeBook.findMany({
           where: { type: { in: ["COMPANY", "ASSOCIATE_POOL"] } },
           orderBy: { type: "asc" },
@@ -397,6 +441,7 @@ export class PrismaFinanceRepository {
             );
           }
           if (!user) {
+            businessChanged = true;
             user = await tx.user.create({
               data: {
                 email: requested.email,
@@ -412,6 +457,7 @@ export class PrismaFinanceRepository {
               user.firstName !== firstName || user.lastName !== lastName;
 
             if (identityChanged) {
+              businessChanged = true;
               user = await tx.user.update({
                 where: { id: user.id },
                 data: {
@@ -458,6 +504,27 @@ export class PrismaFinanceRepository {
           const currentMemberships = await tx.financeBookMember.findMany({
             where: { bookId: book.id, validUntil: null },
           });
+          const shares = (
+            rows: { associateId: string; shareBasisPoints: number }[],
+          ) =>
+            rows
+              .map(
+                ({ associateId, shareBasisPoints }) =>
+                  `${associateId}:${shareBasisPoints}`,
+              )
+              .sort();
+          if (
+            JSON.stringify(shares(currentMemberships)) !==
+            JSON.stringify(
+              shares(
+                resolvedAssociates.map((member) => ({
+                  associateId: member.id,
+                  shareBasisPoints: member.shareBasisPoints,
+                })),
+              ),
+            )
+          )
+            businessChanged = true;
           const nextIds = new Set(
             resolvedAssociates.map((associate) => associate.id),
           );
@@ -504,6 +571,17 @@ export class PrismaFinanceRepository {
           orderBy: [{ validFrom: "asc" }, { createdAt: "asc" }, { id: "asc" }],
         });
 
+        if (businessChanged)
+          await publishNotificationEvent(tx, {
+            type: "finance.company.updated",
+            category: "other",
+            actorId,
+            subjectType: "finance",
+            subjectId: companyBook.id,
+            permissionKey: "super_admin",
+            targetPath: "/company/associates",
+            changes: ["associates"],
+          });
         return {
           members,
           managingOwnerId: foundingMembership.associateId,
@@ -861,7 +939,15 @@ export class PrismaFinanceRepository {
         where: { id: operation.id },
         data: { status: "POSTED", postedAt },
       });
-
+      await publishNotificationEvent(tx, {
+        type: "expense.posted",
+        category: "expenses",
+        actorId: input.createdById,
+        subjectType: "expense",
+        subjectId: operation.id,
+        permissionKey: "finance.operations.read",
+        targetPath: `/finance/operations/${operation.id}`,
+      });
       return operation.id;
     });
   }
@@ -924,7 +1010,15 @@ export class PrismaFinanceRepository {
         where: { id: operation.id },
         data: { status: "POSTED", postedAt },
       });
-
+      await publishNotificationEvent(tx, {
+        type: "finance.funding.posted",
+        category: "other",
+        actorId: input.createdById,
+        subjectType: "finance",
+        subjectId: operation.id,
+        permissionKey: "finance.operations.read",
+        targetPath: `/finance/operations/${operation.id}`,
+      });
       return operation.id;
     });
   }
@@ -970,7 +1064,22 @@ export class PrismaFinanceRepository {
       if (marked.count !== 1) {
         throw new ConcurrentReversalError(input.originalOperationId);
       }
-
+      const original = await tx.financialOperation.findUnique({
+        where: { id: input.originalOperationId },
+        select: { kind: true },
+      });
+      await publishNotificationEvent(tx, {
+        type:
+          original?.kind === "EXPENSE"
+            ? "expense.reversed"
+            : "finance.reversed",
+        category: original?.kind === "EXPENSE" ? "expenses" : "other",
+        actorId: input.createdById,
+        subjectType: original?.kind === "EXPENSE" ? "expense" : "finance",
+        subjectId: reversal.id,
+        permissionKey: "finance.operations.read",
+        targetPath: `/finance/operations/${reversal.id}`,
+      });
       return reversal.id;
     });
   }

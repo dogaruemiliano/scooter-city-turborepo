@@ -16,6 +16,8 @@ describe("Account deactivation admission safety", () => {
     const tx = {
       $executeRaw: jest.fn().mockResolvedValue(1),
       user: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findUnique: jest.fn().mockResolvedValue(null),
         findUniqueOrThrow: jest.fn().mockResolvedValue(user),
         count: jest.fn().mockResolvedValue(remainingAdmins),
         update: jest.fn().mockResolvedValue({
@@ -30,6 +32,9 @@ describe("Account deactivation admission safety", () => {
       authAccount: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
       userInvitation: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       auditEvent: { create: jest.fn().mockResolvedValue({}) },
+      notificationEvent: {
+        create: jest.fn().mockResolvedValue({ id: "event" }),
+      },
     };
     const prisma = {
       $transaction: (
@@ -56,6 +61,7 @@ describe("Account deactivation admission safety", () => {
     expect(tx.session.deleteMany).toHaveBeenCalled();
     expect(tx.userInvitation.updateMany).toHaveBeenCalled();
     expect(tx.auditEvent.create).toHaveBeenCalled();
+    expect(tx.notificationEvent.create).toHaveBeenCalledTimes(1);
   });
 
   it("deactivates ordinary users without requiring a remaining super admin", async () => {

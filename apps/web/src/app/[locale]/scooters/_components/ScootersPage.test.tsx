@@ -1,6 +1,12 @@
 import { v1 } from "@repo/api-shared";
 import { messages, type SupportedLocale } from "@repo/i18n";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -91,6 +97,51 @@ beforeEach(() => {
 });
 
 describe("ScootersPage", () => {
+  it("restores appended scooters and the Y position when returning from details", async () => {
+    const nextScooter = scooterRecord({ id: "scooter-2", fleetNumber: 2 });
+    mocks.apiFetch.mockResolvedValueOnce(
+      scooterList([nextScooter], { page: 2, total: 75 }),
+    );
+    const browser = userEvent.setup();
+    const firstVisit = renderScooters(scooterList([scooter], { total: 75 }));
+    await browser.click(screen.getByRole("button", { name: "Load more" }));
+    const link = await screen.findByRole("link", { name: "View 002 YAM" });
+    const scrollY = vi.spyOn(window, "scrollY", "get").mockReturnValue(850);
+    link.addEventListener("click", (event) => event.preventDefault(), {
+      once: true,
+    });
+    fireEvent.click(link);
+    const listEntry = window.history.state;
+    window.history.pushState({}, "", "/en/scooters/scooter-2");
+    firstVisit.unmount();
+
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    try {
+      window.history.replaceState(listEntry, "", "/en/scooters");
+      renderScooters(scooterList([scooter], { total: 75 }));
+      expect(screen.getByRole("link", { name: "View 002 YAM" })).toBeVisible();
+      await waitFor(() =>
+        expect(scrollTo).toHaveBeenCalledWith({
+          top: 850,
+          behavior: "instant",
+        }),
+      );
+
+      mocks.apiFetch.mockResolvedValueOnce(
+        scooterList([], { page: 3, total: 75 }),
+      );
+      await browser.click(screen.getByRole("button", { name: "Load more" }));
+      expect(mocks.apiFetch).toHaveBeenLastCalledWith(
+        `${v1.scooters.ROUTES.list}?page=3&pageSize=25`,
+        v1.scooters.scooterListSchema,
+        { cache: "no-store" },
+      );
+    } finally {
+      scrollTo.mockRestore();
+      scrollY.mockRestore();
+    }
+  });
+
   it.each([
     { unmounted: false, returnToList: false },
     { unmounted: true, returnToList: false },

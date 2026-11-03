@@ -44,7 +44,9 @@ describe("OpenAI background scooter extraction", () => {
     expect(body.instructions).toContain("First identify the document type");
     expect(body.instructions).toContain("several distinct document types");
     expect(body.instructions).toContain("ASIGURAT");
-    expect(body.instructions).toContain("current Romanian registration");
+    expect(body.instructions).toContain(
+      "Registration details are entered manually by the user",
+    );
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 

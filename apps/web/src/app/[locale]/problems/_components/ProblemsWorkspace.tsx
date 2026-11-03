@@ -397,7 +397,7 @@ export function ProblemsWorkspace({ todo = false }: { todo?: boolean }) {
       >
         <SegmentedRadioGroup
           appearance="pills"
-          containerClassName="relative -mx-4 overflow-x-auto overscroll-x-contain md:-mx-8"
+          containerClassName="relative -mx-4 overflow-x-auto overscroll-x-contain max-md:[scrollbar-width:none] max-md:[&::-webkit-scrollbar]:hidden md:-mx-8"
           className="w-max min-w-full flex-nowrap px-4 md:px-8"
           optionClassName="shrink-0 whitespace-nowrap"
           name="problem-quick-filter"

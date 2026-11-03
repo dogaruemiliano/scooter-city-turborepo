@@ -364,6 +364,29 @@ export function ScooterEditor({
   const createValues = useWatch({
     control: form.control,
   });
+  const registrationCertificateAttached =
+    !scooter &&
+    [...documents.existing, ...documents.drafts].some((document) => {
+      const entry = analysis.entries[document.id];
+      return v1.scooters.hasScooterDocumentType(
+        {
+          type: document.type ?? undefined,
+          extractedData:
+            documents.extractions[document.id] ??
+            (entry?.status === "success"
+              ? entry.analysis.extractedData
+              : "extractedData" in document
+                ? document.extractedData
+                : undefined),
+        },
+        "registration_certificate",
+      );
+    });
+  const registrationEntryRequired =
+    registrationCertificateAttached &&
+    (!createValues.registrationType ||
+      createValues.registrationType === "unregistered" ||
+      !createValues.registrationNumber?.trim());
   const hasCivEvidence =
     v1.scooters.hasScooterCivEvidence({
       ...createValues,
@@ -447,6 +470,19 @@ export function ScooterEditor({
   }, [isSubmitting, submitCount]);
 
   async function submit(input: v1.scooters.UpdateScooterInput) {
+    if (registrationEntryRequired) {
+      const field =
+        !createValues.registrationType ||
+        createValues.registrationType === "unregistered"
+          ? "registrationType"
+          : "registrationNumber";
+      form.setError(field, {
+        type: "validate",
+        message: t("creation.manualRegistration"),
+      });
+      form.setFocus(field);
+      return;
+    }
     if (
       saveConflict ||
       persistenceBlocked ||
@@ -885,6 +921,7 @@ export function ScooterEditor({
   });
 
   const createFormValid =
+    !registrationEntryRequired &&
     scooterCreateFormSchema.safeParse(createValues).success;
   const logicalVinConflict =
     new Set([
@@ -1124,6 +1161,9 @@ export function ScooterEditor({
                         {t("creation.scooterDetails")}
                       </h2>
                       <ScooterCreateFields
+                        registrationCertificateAttached={
+                          registrationCertificateAttached
+                        }
                         compliance={(startNumber) => (
                           <div className="grid gap-6">
                             <ScooterItpValidityFields

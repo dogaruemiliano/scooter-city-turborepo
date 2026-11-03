@@ -415,7 +415,16 @@ describe("document JSON import", () => {
         fileName: "certificate.pdf",
       },
     ]);
-    for (const field of documentImportFields(true))
+    for (const field of documentImportFields(true).filter(
+      (field) =>
+        ![
+          "registrationType",
+          "registrationNumber",
+          "registrationDate",
+          "registrationCertificateNumber",
+          "temporaryRegistrationExpiresAt",
+        ].includes(field),
+    ))
       expect(prompt).toContain(`\n${field}: `);
     expect(prompt).not.toContain("\nregistrationNumber: ");
     expect(prompt).not.toContain("\nbrandId: ");

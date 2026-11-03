@@ -27,6 +27,7 @@ import { AuditEventType } from "../audit/audit.types";
 import { lockAccessLifecycle } from "../auth/utils/admission";
 import type { RequestMetadata } from "../common/http/request-metadata";
 import { PrismaService } from "../prisma/prisma.service";
+import { publishNotificationEvent } from "../notifications/notification-events";
 
 @Injectable()
 export class UsersService {
@@ -65,7 +66,28 @@ export class UsersService {
     id: string,
     data: Pick<Prisma.UserUpdateInput, "firstName" | "lastName">,
   ): Promise<User> {
-    return this.prisma.user.update({ where: { id }, data });
+    return this.prisma.$transaction(async (tx) => {
+      const before = await tx.user.findUniqueOrThrow({ where: { id } });
+      const user = await tx.user.update({ where: { id }, data });
+      const changes = (["firstName", "lastName"] as const).filter(
+        (key) => before[key] !== user[key],
+      );
+      if (changes.length)
+        await publishNotificationEvent(tx, {
+          type: "user.updated",
+          category: "access",
+          actorId: id,
+          subjectType: "user",
+          subjectId: id,
+          subjectLabel: [user.firstName, user.lastName]
+            .filter(Boolean)
+            .join(" "),
+          permissionKey: "users.read",
+          targetPath: `/users/${id}`,
+          changes,
+        });
+      return user;
+    });
   }
 
   /**
@@ -135,6 +157,20 @@ export class UsersService {
           meta: { before: user.loginStatus, after: "DISABLED" },
         },
       });
+      if (user.deletedAt === null)
+        await publishNotificationEvent(tx, {
+          type: "user.status.changed",
+          category: "access",
+          actorId: id,
+          subjectType: "user",
+          subjectId: id,
+          subjectLabel: [user.firstName, user.lastName]
+            .filter(Boolean)
+            .join(" "),
+          permissionKey: "users.read",
+          targetPath: `/users/${id}`,
+          changes: ["status"],
+        });
 
       return deactivated;
     });

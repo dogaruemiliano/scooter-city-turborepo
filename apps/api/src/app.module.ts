@@ -35,6 +35,7 @@ import { ScooterBrandsModule } from "./scooter-brands/scooter-brands.module";
 import { ScootersModule } from "./scooters/scooters.module";
 import { SmsModule } from "./sms/sms.module";
 import { UsersModule } from "./users/users.module";
+import { NotificationsModule } from "./notifications/notifications.module";
 
 // Loaded once at module-graph build time so configurable modules use the
 // same validated environment values exposed by `ConfigModule`.
@@ -60,6 +61,7 @@ const env = loadEnv();
 
     // Internal (non-global) feature modules.
     UsersModule,
+    NotificationsModule,
 
     // Public-surface modules.
     HealthModule,

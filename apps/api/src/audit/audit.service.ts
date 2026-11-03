@@ -20,6 +20,7 @@ import { Logger } from "nestjs-pino";
 // types — not the runtime `JsonNull` sentinel we need to clear a Json column.
 import { Prisma } from "../generated/prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { publishAuditedNotification } from "../notifications/notification-events";
 
 import type { AuditEventType } from "./audit.types";
 
@@ -46,7 +47,8 @@ export class AuditService {
 
   async record(input: RecordAuditInput): Promise<void> {
     try {
-      await this.recordRequired(this.prisma, input);
+      // Best-effort audit writes must never become notification producers.
+      await this.write(this.prisma, input);
     } catch (error) {
       this.logger.error(
         {
@@ -63,7 +65,27 @@ export class AuditService {
     tx: Pick<PrismaService, "auditEvent"> | Prisma.TransactionClient,
     input: RecordAuditInput,
   ): Promise<void> {
-    await tx.auditEvent.create({
+    const event = await this.write(tx, input);
+    // Required business writers supply their originating transaction. Prisma
+    // transaction proxies can expose root methods, so do not infer transaction
+    // identity from the presence of $transaction. Narrow audit-only writers
+    // have no notification delegate.
+    if (
+      typeof (tx as Prisma.TransactionClient).notificationEvent?.create ===
+      "function"
+    )
+      await publishAuditedNotification(
+        tx as Prisma.TransactionClient,
+        input,
+        event.id,
+      );
+  }
+
+  private write(
+    tx: Pick<PrismaService, "auditEvent"> | Prisma.TransactionClient,
+    input: RecordAuditInput,
+  ) {
+    return tx.auditEvent.create({
       data: {
         type: input.type,
         userId: input.userId ?? null,

@@ -3,6 +3,7 @@ import { v1 } from "@repo/api-shared";
 
 import { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
+import { publishNotificationEvent } from "../../notifications/notification-events";
 
 export type FinanceLegalIdentityRecord = Awaited<
   ReturnType<PrismaExpenseExtractionRepository["findCompanyIdentity"]>
@@ -18,26 +19,56 @@ export class PrismaExpenseExtractionRepository {
     });
   }
 
-  async upsertCompanyIdentity(input: {
-    bookId: string;
-    legalName: string;
-    normalizedLegalName: string;
-    taxIdentifier: string;
-    normalizedTaxIdentifier: string;
-    nameAliases: string[];
-    countryCode: string;
-  }) {
-    return this.prisma.financeLegalIdentity.upsert({
-      where: { bookId: input.bookId },
-      create: input,
-      update: {
-        legalName: input.legalName,
-        normalizedLegalName: input.normalizedLegalName,
-        taxIdentifier: input.taxIdentifier,
-        normalizedTaxIdentifier: input.normalizedTaxIdentifier,
-        nameAliases: input.nameAliases,
-        countryCode: input.countryCode,
-      },
+  async upsertCompanyIdentity(
+    input: {
+      bookId: string;
+      legalName: string;
+      normalizedLegalName: string;
+      taxIdentifier: string;
+      normalizedTaxIdentifier: string;
+      nameAliases: string[];
+      countryCode: string;
+    },
+    actorId?: string,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const before = await tx.financeLegalIdentity.findUnique({
+        where: { bookId: input.bookId },
+      });
+      const identity = await tx.financeLegalIdentity.upsert({
+        where: { bookId: input.bookId },
+        create: input,
+        update: {
+          legalName: input.legalName,
+          normalizedLegalName: input.normalizedLegalName,
+          taxIdentifier: input.taxIdentifier,
+          normalizedTaxIdentifier: input.normalizedTaxIdentifier,
+          nameAliases: input.nameAliases,
+          countryCode: input.countryCode,
+        },
+      });
+      const changes = Object.keys(input).filter(
+        (key) =>
+          ![
+            "bookId",
+            "normalizedLegalName",
+            "normalizedTaxIdentifier",
+          ].includes(key) &&
+          JSON.stringify(before?.[key as keyof typeof before]) !==
+            JSON.stringify(identity[key as keyof typeof identity]),
+      );
+      if (changes.length)
+        await publishNotificationEvent(tx, {
+          type: "finance.company.updated",
+          category: "other",
+          actorId,
+          subjectType: "finance",
+          subjectId: identity.id,
+          permissionKey: "super_admin",
+          targetPath: "/company/settings",
+          changes,
+        });
+      return identity;
     });
   }
 

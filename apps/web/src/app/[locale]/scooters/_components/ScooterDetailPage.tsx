@@ -13,14 +13,8 @@ import {
   AccordionTrigger,
   AccordionContent,
   Alert,
+  AlertDescription,
   AlertTitle,
-  BottomSheet,
-  BottomSheetBody,
-  BottomSheetClose,
-  BottomSheetContent,
-  BottomSheetFooter,
-  BottomSheetHeader,
-  BottomSheetTitle,
   Button,
   Card,
   CardContent,
@@ -44,13 +38,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import {
-  useEffect,
-  useId,
-  useState,
-  type FormEvent,
-  type ReactNode,
-} from "react";
+import { useState, type ReactNode } from "react";
 
 import { useOptionalSession } from "@/components/auth/SessionProvider";
 import { canAccess } from "@/lib/access";
@@ -59,26 +47,13 @@ import { PageTitleOverride } from "@/components/PageTitleOverride";
 import { PageHeaderNavigation } from "@/components/PageHeaderNavigation";
 import { webApi } from "@/lib/api";
 import { localizePath, resolveRouteLocale } from "@/i18n/paths";
-import {
-  FeedbackAlert,
-  formErrorsFromIssues,
-  scooterFieldConflict,
-} from "./scooter-feedback";
+import { FeedbackAlert } from "./scooter-feedback";
 import { CivDetails } from "./CivDetails";
 import { useShareClientDocuments } from "./useShareClientDocuments";
 import { ScooterDetailDocuments } from "./ScooterDetailDocuments";
 import { ScooterDetailPhotos } from "./ScooterDetailPhotos";
 import { ScooterDetailHero } from "./ScooterDetailHero";
-import { ScooterRegistrationFormFields } from "./ScooterRegistrationFormFields";
-import {
-  buildScooterRegistrationInputCandidate,
-  fieldFromIssue,
-  fieldLabel,
-  formatValidationIssue,
-  scooterFormFromScooter,
-  type ScooterFormErrors,
-  type ScooterFormState,
-} from "./scooter-form";
+import { usePreviousScooterPathname } from "./ScooterNavigation";
 
 interface ScooterDetailPageProps {
   scooter: v1.scooters.Scooter;
@@ -99,6 +74,7 @@ export function ScooterDetailPage({
   const session = useOptionalSession();
   const locale = useLocale();
   const router = useRouter();
+  const previousPathname = usePreviousScooterPathname();
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const clientDocumentShare = useShareClientDocuments(
@@ -106,34 +82,9 @@ export function ScooterDetailPage({
     canAccess(session?.user, "scooter_documents.read"),
   );
   const readiness = v1.scooters.scooterReadinessIssues(scooter);
-  const [registrationOpen, setRegistrationOpen] = useState(false);
-  const [registrationDialogKey, setRegistrationDialogKey] = useState(0);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const title = v1.scooters.scooterDisplayCode(scooter);
   const scooterEditHref = `${scootersHref}/${encodeURIComponent(scooter.id)}/edit`;
-
-  async function updateScooter(
-    input: v1.scooters.UpdateScooterInput,
-  ): Promise<boolean> {
-    setFeedback(null);
-    setBusyAction("scooter:update");
-    try {
-      await webApi.fetch(
-        v1.scooters.ROUTES.update(scooter.id),
-        v1.scooters.scooterSchema,
-        { method: "PATCH", json: input },
-      );
-      setFeedback({
-        kind: "success",
-        title: t("feedback.updateSuccessTitle"),
-        messages: [t("feedback.updateSuccessMessage")],
-      });
-      router.refresh();
-      return true;
-    } finally {
-      setBusyAction(null);
-    }
-  }
 
   async function deleteScooter(): Promise<boolean> {
     setFeedback(null);
@@ -164,7 +115,12 @@ export function ScooterDetailPage({
   return (
     <PageLayout>
       <PageTitleOverride title={title} />
-      <PageHeaderNavigation onBack={() => router.push(scootersHref)} />
+      <PageHeaderNavigation
+        onBack={() => {
+          if (previousPathname === "/scooters") router.back();
+          else router.push(scootersHref);
+        }}
+      />
       <div className="hidden justify-end md:flex">
         <MoreActionsMenu
           ariaLabel={t("actions.moreActions")}
@@ -191,21 +147,6 @@ export function ScooterDetailPage({
                     `${localizePath("/problems/new", resolveRouteLocale(locale))}?scooterId=${encodeURIComponent(scooter.id)}`,
                   ),
               },
-              ...(scooter.registrationType === "unregistered"
-                ? [
-                    {
-                      key: "registration",
-                      permission: "scooters.update",
-                      label: t("actions.addRegistration"),
-                      icon: <PencilIcon data-icon="inline-start" />,
-                      disabled: busyAction !== null,
-                      onClick: () => {
-                        setRegistrationDialogKey((current) => current + 1);
-                        setRegistrationOpen(true);
-                      },
-                    },
-                  ]
-                : []),
               {
                 key: "edit",
                 permission: "scooters.update",
@@ -243,6 +184,21 @@ export function ScooterDetailPage({
               }
             >
               <AlertTitle>{t(`readiness.${issue}`)}</AlertTitle>
+              {issue === "needsClientDocuments" ? (
+                <AlertDescription>
+                  <div>{t("readiness.clientDocumentsHint")}</div>
+                  <ul className="list-disc pl-4">
+                    {scooter.missingClientDocuments?.map((type) => (
+                      <li key={type}>
+                        {v1.scooters.scooterDocumentTypeSchema.safeParse(type)
+                          .success
+                          ? t(`documents.${type}`)
+                          : t("documents.other")}
+                      </li>
+                    ))}
+                  </ul>
+                </AlertDescription>
+              ) : null}
             </Alert>
           ))}
         </div>
@@ -409,14 +365,6 @@ export function ScooterDetailPage({
           </AccordionContent>
         </AccordionItem>
       </Accordion>
-      <ScooterRegistrationDialog
-        key={`edit-scooter-registration-${registrationDialogKey}`}
-        scooter={scooter}
-        busy={busyAction === "scooter:update"}
-        open={registrationOpen}
-        onOpenChange={setRegistrationOpen}
-        onSubmit={updateScooter}
-      />
       <DeleteScooterDialog
         open={deleteOpen}
         busy={busyAction === "scooter:delete"}
@@ -424,184 +372,6 @@ export function ScooterDetailPage({
         onConfirm={deleteScooter}
       />
     </PageLayout>
-  );
-}
-
-function ScooterRegistrationDialog({
-  scooter,
-  busy,
-  open,
-  onOpenChange,
-  onSubmit,
-}: {
-  scooter: v1.scooters.Scooter;
-  busy: boolean;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSubmit: (input: v1.scooters.UpdateScooterInput) => Promise<boolean>;
-}) {
-  const formAction = useFormAction();
-
-  const t = useTranslations("scooters");
-  const formId = useId();
-  const [form, setForm] = useState(() => scooterFormFromScooter(scooter));
-  const [fieldErrors, setFieldErrors] = useState<ScooterFormErrors>({});
-  const [error, setError] = useState<string | null>(null);
-  const plateError = fieldErrors.registrationNumber;
-  useEffect(() => {
-    if (open && !busy && plateError)
-      document.getElementById(`${formId}-plate-number`)?.focus();
-  }, [open, busy, plateError, formId]);
-
-  function changeOpen(nextOpen: boolean) {
-    if (busy) return;
-    onOpenChange(nextOpen);
-    if (nextOpen) {
-      setForm(scooterFormFromScooter(scooter));
-      setFieldErrors({});
-      setError(null);
-    }
-  }
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (busy) return;
-    setFieldErrors({});
-    setError(null);
-
-    const candidate = buildScooterRegistrationInputCandidate(form, {
-      required: (field) =>
-        t("feedback.validation.required", { field: fieldLabel(field, t) }),
-      invalidDate: (field) =>
-        t("feedback.validation.invalid", {
-          field: fieldLabel(field, t),
-        }),
-      invalidNumber: (field) =>
-        t("feedback.validation.invalidNumber", {
-          field: fieldLabel(field, t),
-        }),
-      invalidPlateNumber: () => t("feedback.validation.invalidPlateNumber"),
-      engineCcRequired: () => t("feedback.validation.engineCcRequired"),
-      engineCcElectric: () => t("feedback.validation.engineCcElectric"),
-      invalidMileage: () => t("feedback.validation.invalidMileage"),
-    });
-
-    if (candidate.errors) {
-      setFieldErrors(candidate.errors);
-      setError(
-        Object.values(candidate.errors)[0] ?? t("feedback.genericError"),
-      );
-      return;
-    }
-
-    const input = v1.scooters.updateScooterInputSchema.safeParse(
-      candidate.input,
-    );
-
-    if (!input.success) {
-      const nextFieldErrors = formErrorsFromIssues(
-        input.error.issues,
-        (issue, field) => formatValidationIssue(issue, field, t),
-      );
-      setFieldErrors(nextFieldErrors);
-      setError(
-        input.error.issues[0]
-          ? formatValidationIssue(
-              input.error.issues[0],
-              fieldFromIssue(input.error.issues[0]),
-              t,
-            )
-          : t("feedback.genericError"),
-      );
-      return;
-    }
-
-    try {
-      if (await onSubmit(input.data)) onOpenChange(false);
-    } catch (error) {
-      const conflict = scooterFieldConflict(error);
-      const message = conflict
-        ? t(
-            conflict.field === "registrationNumber"
-              ? "feedback.plateConflict"
-              : "feedback.vinConflict",
-          )
-        : error instanceof Error
-          ? error.message
-          : t("feedback.genericError");
-      setError(message);
-      if (conflict) {
-        setFieldErrors({ [conflict.field]: message });
-      }
-    }
-  }
-
-  function setFormValue<Key extends keyof ScooterFormState>(
-    key: Key,
-    value: ScooterFormState[Key],
-  ) {
-    setForm((current) => ({ ...current, [key]: value }));
-    setFieldErrors((current) => {
-      if (!current[key]) {
-        return current;
-      }
-      const next = { ...current };
-      delete next[key];
-      return next;
-    });
-  }
-
-  const title =
-    scooter.registrationType === "unregistered"
-      ? t("actions.addRegistration")
-      : t("actions.editRegistration");
-
-  return (
-    <BottomSheet open={open} onOpenChange={changeOpen}>
-      <BottomSheetContent className="lg:w-xl">
-        <form
-          className="contents"
-          noValidate
-          onSubmit={(event) => void submit(event)}
-        >
-          <BottomSheetHeader>
-            <BottomSheetTitle>{title}</BottomSheetTitle>
-          </BottomSheetHeader>
-          <BottomSheetBody>
-            {error ? (
-              <FeedbackAlert
-                feedback={{
-                  kind: "error",
-                  title: t("feedback.updateErrorTitle"),
-                  messages: [error],
-                }}
-              />
-            ) : null}
-            <ScooterRegistrationFormFields
-              formId={formId}
-              form={form}
-              errors={fieldErrors}
-              disabled={busy}
-              onSetValue={setFormValue}
-            />
-          </BottomSheetBody>
-          <BottomSheetFooter className="sm:flex-row-reverse sm:justify-start">
-            <SaveButton
-              type="submit"
-              disabled={busy}
-              {...formAction("save", { pending: busy }, t("actions.save"))}
-            />
-            <BottomSheetClose
-              render={
-                <Button type="button" variant="outline" disabled={busy} />
-              }
-            >
-              {t("actions.cancel")}
-            </BottomSheetClose>
-          </BottomSheetFooter>
-        </form>
-      </BottomSheetContent>
-    </BottomSheet>
   );
 }
 

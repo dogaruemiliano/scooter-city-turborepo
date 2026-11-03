@@ -9,6 +9,7 @@ import { setRequestLocale } from "next-intl/server";
 
 import { WorkspaceNotifications } from "../../components/WorkspaceNotifications";
 import { AppShell } from "../../components/AppShell";
+import { ActivityNotificationsProvider } from "../../components/notifications/ActivityNotificationsProvider";
 import { SessionProvider } from "../../components/auth/SessionProvider";
 import { meFromApi } from "../../lib/auth-server";
 import { pwaMetadata } from "../../lib/pwa";
@@ -16,6 +17,7 @@ import {
   resolveDataTheme,
   resolveThemePreference,
   THEME_COOKIE_NAME,
+  themeColorMetadata,
 } from "../../lib/theme-cookie";
 import "../globals.css";
 
@@ -41,13 +43,19 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export const viewport: Viewport = {
-  width: "device-width",
-  viewportFit: "cover",
-  initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
-};
+export async function generateViewport(): Promise<Viewport> {
+  const cookieStore = await cookies();
+  return {
+    width: "device-width",
+    viewportFit: "cover",
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+    themeColor: themeColorMetadata(
+      resolveThemePreference(cookieStore.get(THEME_COOKIE_NAME)?.value),
+    ),
+  };
+}
 
 export function generateStaticParams() {
   return supportedLocales.map((locale) => ({ locale }));
@@ -88,9 +96,11 @@ export default async function RootLayout({
             <WorkspaceNotifications>
               <TooltipProvider>
                 <SessionProvider initialUser={initialUser}>
-                  <AppShell initialThemePreference={initialThemePreference}>
-                    {children}
-                  </AppShell>
+                  <ActivityNotificationsProvider>
+                    <AppShell initialThemePreference={initialThemePreference}>
+                      {children}
+                    </AppShell>
+                  </ActivityNotificationsProvider>
                 </SessionProvider>
               </TooltipProvider>
             </WorkspaceNotifications>

@@ -68,8 +68,12 @@ export class ScooterPhotosController {
   @Patch("reorder")
   @RequireAllScope("scooters.update")
   @ZodResponse({ type: [Photo] })
-  reorder(@Param("id") id: string, @Body() input: ReorderPhotos) {
-    return this.photos.reorder(id, input.photoIds);
+  reorder(
+    @Param("id") id: string,
+    @Body() input: ReorderPhotos,
+    @CurrentUser() user: AuthPrincipal,
+  ) {
+    return this.photos.reorder(id, input.photoIds, user.id);
   }
 
   @Patch(":photoId")
@@ -79,15 +83,20 @@ export class ScooterPhotosController {
     @Param("id") id: string,
     @Param("photoId") photoId: string,
     @Body() input: UpdatePhoto,
+    @CurrentUser() user: AuthPrincipal,
   ) {
-    return this.photos.update(id, photoId, input);
+    return this.photos.update(id, photoId, input, user.id);
   }
 
   @Delete(":photoId")
   @RequireAllScope("scooters.update")
   @ZodResponse({ type: [Photo] })
-  remove(@Param("id") id: string, @Param("photoId") photoId: string) {
-    return this.photos.remove(id, photoId);
+  remove(
+    @Param("id") id: string,
+    @Param("photoId") photoId: string,
+    @CurrentUser() user: AuthPrincipal,
+  ) {
+    return this.photos.remove(id, photoId, user.id);
   }
 
   @Get(":photoId/content")

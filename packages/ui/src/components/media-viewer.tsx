@@ -217,10 +217,7 @@ function MediaViewerSession({
           >
             <EllipsisVerticalIcon aria-hidden="true" className="size-5" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="end"
-            className="w-auto max-w-[calc(100vw-var(--spacing-4))]"
-          >
+          <DropdownMenuContent align="end">
             {canCrop && onCrop ? (
               <DropdownMenuItem
                 disabled={disabled || cropLoading}
