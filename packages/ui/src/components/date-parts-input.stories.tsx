@@ -84,6 +84,24 @@ export const Romanian: Story = {
   render: (args) => <DatePartsInputDemo label={args.label} locale="ro" />,
 };
 
+export const BackwardDeletion: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Focus the empty year and press Backspace to move to the month and delete its last digit. Keep pressing Backspace to erase through the day. The cursor stays at the end of the previous segment.",
+      },
+    },
+  },
+  render: (args) => (
+    <DatePartsInputDemo
+      defaultValue={{ day: "12", month: "08", year: "" }}
+      label={args.label}
+      locale={args.locale}
+    />
+  ),
+};
+
 export const Invalid: Story = {
   render: (args) => (
     <DatePartsInputDemo invalid label={args.label} locale={args.locale} />

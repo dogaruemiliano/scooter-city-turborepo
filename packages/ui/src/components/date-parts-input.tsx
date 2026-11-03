@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { CalendarIcon } from "lucide-react";
 
@@ -71,6 +71,7 @@ export function DatePartsInput({
   onBlur,
   onChange,
 }: DatePartsInputProps) {
+  const dayRef = useRef<HTMLInputElement>(null);
   const monthRef = useRef<HTMLInputElement>(null);
   const yearRef = useRef<HTMLInputElement>(null);
   const dayPlaceholder = locale === "ro" ? "ZZ" : "DD";
@@ -94,6 +95,26 @@ export function DatePartsInput({
     }
   }
 
+  function deleteFromPreviousPart(
+    event: KeyboardEvent<HTMLInputElement>,
+    previousPart: keyof DateParts,
+    previousInput: HTMLInputElement | null,
+  ) {
+    if (
+      event.key !== "Backspace" ||
+      event.currentTarget.value !== "" ||
+      !previousInput
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    const nextValue = value[previousPart].slice(0, -1);
+    onChange({ ...value, [previousPart]: nextValue });
+    previousInput.focus();
+    previousInput.setSelectionRange(nextValue.length, nextValue.length);
+  }
+
   return (
     <div
       data-disabled={disabled || undefined}
@@ -107,6 +128,7 @@ export function DatePartsInput({
       }}
     >
       <Input
+        ref={dayRef}
         id={`${baseId}-day`}
         aria-describedby={ariaDescribedBy}
         aria-invalid={ariaInvalid}
@@ -147,6 +169,9 @@ export function DatePartsInput({
         onChange={(event) =>
           changePart("month", event.target.value, 2, yearRef.current)
         }
+        onKeyDown={(event) =>
+          deleteFromPreviousPart(event, "day", dayRef.current)
+        }
       />
       <span
         aria-hidden="true"
@@ -171,6 +196,9 @@ export function DatePartsInput({
         value={value.year}
         className="min-w-0 flex-2 px-2"
         onChange={(event) => changePart("year", event.target.value, 4)}
+        onKeyDown={(event) =>
+          deleteFromPreviousPart(event, "month", monthRef.current)
+        }
       />
       <CalendarPicker
         description={calendarDescription}
