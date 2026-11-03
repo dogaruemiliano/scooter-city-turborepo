@@ -2,6 +2,7 @@ import { userAvatarSrc } from "@/lib/user-avatar";
 import Link from "next/link";
 import { v1 } from "@repo/api-shared";
 import {
+  AvatarGroup,
   UserAvatar,
   Badge,
   Button,
@@ -15,7 +16,7 @@ import {
 } from "@repo/ui/components";
 import { Clock, Paperclip } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
-import { memberName } from "./ProblemForms";
+import { memberName } from "../_lib/member-name";
 
 const difficultyAccent = {
   easy: "bg-difficulty-easy",
@@ -45,10 +46,8 @@ export function ProblemListItem({
   const difficulty = problem.scooterId === null ? null : problem.difficulty;
   const t = useTranslations("workspace.problems");
   const format = useFormatter();
-  const assignee = v1.problems
-    .problemAssignees(problem)
-    .map(memberName)
-    .join(", ");
+  const assignees = v1.problems.problemAssignees(problem);
+  const assignee = assignees[0];
   const internalId = problem.scooter
     ? v1.scooters.scooterDisplayCode(problem.scooter)
     : "";
@@ -152,18 +151,33 @@ export function ProblemListItem({
         <CardContent className="flex flex-wrap gap-2">{badges}</CardContent>
       ) : null}
       <CardFooter className="mx-(--card-spacing) flex-wrap justify-between gap-3 rounded-none px-0 text-xs text-muted-foreground">
-        <div className="flex min-w-0 items-center gap-2">
-          <UserAvatar
-            aria-hidden="true"
-            name={assignee || undefined}
-            src={userAvatarSrc(
-              v1.problems.problemAssignees(problem)[0]?.avatarAssetId,
-            )}
-          />
-          <span className="min-w-0 wrap-anywhere">
-            {assignee || t("unassigned")}
-          </span>
-        </div>
+        {assignees.length > 1 ? (
+          <AvatarGroup
+            role="img"
+            aria-label={assignees.map(memberName).join(", ")}
+            className="min-w-0 max-w-full flex-wrap gap-y-2"
+          >
+            {assignees.map((member) => (
+              <UserAvatar
+                key={member.id}
+                aria-hidden="true"
+                name={memberName(member)}
+                src={userAvatarSrc(member.avatarAssetId)}
+              />
+            ))}
+          </AvatarGroup>
+        ) : (
+          <div className="flex min-w-0 items-center gap-2">
+            <UserAvatar
+              aria-hidden="true"
+              name={memberName(assignee) || undefined}
+              src={userAvatarSrc(assignee?.avatarAssetId)}
+            />
+            <span className="min-w-0 wrap-anywhere">
+              {memberName(assignee) || t("unassigned")}
+            </span>
+          </div>
+        )}
         <div className="flex shrink-0 items-center gap-3">
           {problem.photos?.length ? (
             <span
