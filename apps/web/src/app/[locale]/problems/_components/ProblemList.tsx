@@ -16,13 +16,16 @@ export function ProblemList({
   status,
   empty,
   renderItem,
+  todo = false,
 }: {
   items: readonly v1.problems.Problem[];
   status: v1.problems.Problem["status"] | "";
   empty: ReactNode;
   renderItem: (problem: v1.problems.Problem) => ReactNode;
+  todo?: boolean;
 }) {
-  const t = useTranslations("workspace.problems");
+  const t = useTranslations("workspace");
+  const namespace = todo ? "todos" : "problems";
   if (!items.length) return empty;
   if (status)
     return (
@@ -36,13 +39,13 @@ export function ProblemList({
 
   return (
     <HorizontalScrollArea
-      label={t("boardLabel")}
+      label={t(`${namespace}.boardLabel`)}
       fadeEdges
       fadeWidth="var(--page-gutter)"
       className="-mx-(--page-gutter) w-auto"
       scrollbarVisibility="hidden"
-      scrollLeftLabel={t("scrollLeft")}
-      scrollRightLabel={t("scrollRight")}
+      scrollLeftLabel={t(`${namespace}.scrollLeft`)}
+      scrollRightLabel={t(`${namespace}.scrollRight`)}
     >
       <div className="flex min-w-0 flex-col gap-4 px-(--page-gutter) lg:grid lg:min-w-[calc(var(--spacing-72)*4+var(--spacing-6)*3+var(--page-gutter)*2)] lg:grid-cols-[repeat(4,minmax(var(--spacing-72),1fr))] lg:items-start lg:gap-6">
         {v1.problems.problemStatusSchema.options.map((lane) => {
@@ -50,7 +53,7 @@ export function ProblemList({
           return (
             <section
               key={lane}
-              aria-label={t(lane)}
+              aria-label={t(`problems.${lane}`)}
               className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4"
             >
               <h2 className="hidden items-center gap-2 px-1 text-sm font-semibold text-muted-foreground lg:flex">
@@ -58,7 +61,7 @@ export function ProblemList({
                   aria-hidden="true"
                   className={`size-2 shrink-0 rounded-full ${statusTone[lane]}`}
                 />
-                {t(lane)}
+                {t(`problems.${lane}`)}
                 <Badge variant="secondary" className="ml-auto">
                   {problems.length}
                 </Badge>
@@ -71,7 +74,7 @@ export function ProblemList({
                 />
               ) : (
                 <div className="hidden min-h-32 items-center justify-center rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground lg:flex">
-                  {t("boardEmpty")}
+                  {t(`${namespace}.boardEmpty`)}
                 </div>
               )}
             </section>

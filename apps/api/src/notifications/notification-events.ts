@@ -44,6 +44,9 @@ export interface PublishNotificationInput {
   changes?: string[];
   assignedIds?: string[];
   removedIds?: string[];
+  /** Explicit reminders use normal recipient policies without broadcasting. */
+  recipientIds?: string[];
+  createdAt?: Date;
 }
 
 const scooterSelect = {
@@ -109,7 +112,8 @@ export async function publishNotificationEvent(
   const assigned = new Set(input.assignedIds ?? []);
   const removed = new Set(input.removedIds ?? []);
   for (const user of users) {
-    if (user.id === input.actorId) continue;
+    if (input.recipientIds && !input.recipientIds.includes(user.id)) continue;
+    if (user.id === input.actorId && !input.recipientIds) continue;
     const snapshot = snapshotForNotificationUser(user);
     const source = snapshot.effectiveScopes[input.permissionKey] ?? [];
     const fullSource = snapshot.isSuperAdmin || source.includes("ALL");
@@ -151,6 +155,7 @@ export async function publishNotificationEvent(
   await tx.notificationEvent.create({
     data: {
       ...(input.id ? { id: input.id } : {}),
+      ...(input.createdAt ? { createdAt: input.createdAt } : {}),
       type: input.type,
       category: input.category,
       actorId: input.actorId ?? null,

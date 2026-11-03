@@ -30,6 +30,8 @@ export const apiCatalog = {
       rateLimited: "Too many requests. Try again in {ttl} seconds.",
       unauthorized: "Authentication is required.",
       validation: "The request contains invalid data.",
+      problemResolutionRequired:
+        "Add resolution notes before completing this task.",
     },
   },
   ro: {
@@ -67,6 +69,8 @@ export const apiCatalog = {
       rateLimited: "Prea multe cereri. Încearcă din nou în {ttl} secunde.",
       unauthorized: "Autentificarea este necesară.",
       validation: "Cererea conține date invalide.",
+      problemResolutionRequired:
+        "Adaugă note de rezolvare înainte de a finaliza această sarcină.",
     },
   },
 } as const;

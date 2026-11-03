@@ -11,6 +11,7 @@ import { SectionDeleteAction } from "./SectionDeleteAction";
 export function ProblemChecklist({
   problem,
   kind = "checklist",
+  todo = false,
   editable,
   busy,
   error,
@@ -20,6 +21,7 @@ export function ProblemChecklist({
 }: {
   problem: Pick<v1.problems.Problem, "checklist" | "buyList">;
   kind?: "checklist" | "buyList";
+  todo?: boolean;
   initialOpen?: boolean;
   onEditorClose?: () => void;
   editable: boolean;
@@ -129,10 +131,8 @@ export function ProblemChecklist({
             empty: t(kind === "buyList" ? "emptyBuyList" : "emptyChecklist"),
             add,
             input: t(kind === "buyList" ? "buyListItem" : "checklistItem"),
-            placeholder: t(
-              kind === "buyList"
-                ? "buyListPlaceholder"
-                : "checklistPlaceholder",
+            placeholder: shared(
+              `${todo ? "todos" : "problems"}.${kind === "buyList" ? "buyListPlaceholder" : "checklistPlaceholder"}`,
             ),
             save: t(kind === "buyList" ? "saveBuyList" : "saveChecklist"),
             cancel: shared("cancel"),

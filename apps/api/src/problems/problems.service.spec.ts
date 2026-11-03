@@ -115,6 +115,126 @@ describe("ProblemsService authorization and write conflicts", () => {
     });
   });
 
+  it("auto-assigns a worker's new issue without general assignment permission", async () => {
+    access.getSnapshot.mockResolvedValue({
+      ...snapshot,
+      effectiveScopes: {
+        ...snapshot.effectiveScopes,
+        "problems.create": ["ALL"],
+        "scooters.read": ["ASSIGNED"],
+      },
+    });
+    db.scooter.findFirst.mockResolvedValue({ id: "scooter" });
+    db.scooterProblem.create.mockResolvedValue(row);
+    await service.create(
+      "mechanic",
+      v1.problems.createProblemInputSchema.parse({
+        scooterId: "scooter",
+        title: "Check brakes",
+        difficulty: "easy",
+      }),
+    );
+    expect(db.scooterProblem.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reporterId: "mechanic",
+          assigneeId: "mechanic",
+          assignees: { connect: [{ id: "mechanic" }] },
+        }) as unknown,
+      }),
+    );
+  });
+
+  it("rejects a crafted creation assigning another worker", async () => {
+    access.getSnapshot.mockResolvedValue({
+      ...snapshot,
+      effectiveScopes: {
+        ...snapshot.effectiveScopes,
+        "problems.create": ["ALL"],
+      },
+    });
+    db.scooter.findFirst.mockResolvedValue({ id: "scooter" });
+    await expect(
+      service.create(
+        "mechanic",
+        v1.problems.createProblemInputSchema.parse({
+          scooterId: "scooter",
+          title: "Check brakes",
+          difficulty: "easy",
+          assigneeIds: ["other"],
+        }),
+      ),
+    ).rejects.toThrow(ForbiddenException);
+    expect(db.scooterProblem.create).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, "", "   "])(
+    "requires worker resolution notes (%j)",
+    async (resolutionNotes) => {
+      await expect(
+        service.resolve("mechanic", "problem", {
+          revision: 1,
+          resolutionNotes,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(db.scooterProblem.updateMany).not.toHaveBeenCalled();
+    },
+  );
+
+  it("does not let a non-admin complete another worker's task with an ALL override", async () => {
+    access.getSnapshot.mockResolvedValue({
+      ...snapshot,
+      effectiveScopes: {
+        "problems.resolve": ["ALL"],
+        "problems.read": ["ALL"],
+      },
+    });
+    db.scooterProblem.findFirst.mockResolvedValue({
+      ...row,
+      assigneeId: "other",
+      assignee: { id: "other" },
+      assignees: [],
+    });
+    await expect(
+      service.resolve("mechanic", "problem", {
+        revision: 1,
+        resolutionNotes: "Done",
+      }),
+    ).rejects.toThrow(ForbiddenException);
+    expect(db.scooterProblem.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("allows admin completion without notes or assignment and keeps the actual actor", async () => {
+    access.getSnapshot.mockResolvedValue({
+      ...snapshot,
+      userId: "admin",
+      isAdmin: true,
+      effectiveScopes: {
+        "problems.resolve": ["ALL"],
+        "problems.read": ["ALL"],
+      },
+    });
+    db.scooterProblem.findFirst.mockResolvedValue({
+      ...row,
+      assigneeId: null,
+      assignee: null,
+      assignees: [],
+    });
+    await service.resolve("admin", "problem", { revision: 1 });
+    expect(db.scooterProblem.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: "resolved",
+          resolutionNotes: null,
+        }) as unknown,
+      }),
+    );
+    expect(audit.recordRequired).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({ userId: "admin", type: "PROBLEM_RESOLVED" }),
+    );
+  });
+
   it("rejects todo creation and listing for non-admins with full problem grants", async () => {
     access.getSnapshot.mockResolvedValue({
       ...snapshot,

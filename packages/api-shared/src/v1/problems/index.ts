@@ -246,10 +246,33 @@ export const updateProblemInputSchema = revisionInputSchema
     message: "Cannot start and pause work together",
   });
 export const resolveProblemInputSchema = revisionInputSchema.extend({
-  resolutionNotes: z.string().trim().min(1).max(4000),
+  /** Optional for admins; the API requires nonempty notes from assigned workers. */
+  resolutionNotes: z.string().trim().max(4000).optional(),
   /** @deprecated Accepted for older clients; closing always clears this problem’s hold. */
   clearMaintenanceHold: z.boolean().optional(),
 });
+export const PROBLEM_REMINDER_COOLDOWN_MS = 60_000;
+export const problemReminderInputSchema = revisionInputSchema.extend({
+  assigneeId: z.string().min(1),
+});
+export const problemCreationScootersSchema = z.object({
+  items: z.array(maintenanceScooterSchema),
+});
+export const problemReminderStatusSchema = z.object({
+  serverNow: z.iso.datetime(),
+  items: z.array(
+    z.object({
+      assigneeId: z.string(),
+      nextAllowedAt: z.iso.datetime().nullable(),
+    }),
+  ),
+});
+export const problemReminderResultSchema = z.object({
+  sent: z.boolean(),
+  serverNow: z.iso.datetime(),
+  nextAllowedAt: z.iso.datetime(),
+});
+export type ProblemReminderInput = z.infer<typeof problemReminderInputSchema>;
 export const assignProblemInputSchema = revisionInputSchema
   .extend({
     assigneeId: z.string().min(1).nullable().optional(),

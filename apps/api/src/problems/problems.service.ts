@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { v1 } from "@repo/api-shared";
 import { publishNotificationEvent } from "../notifications/notification-events";
+import { hasNotificationScope } from "../notifications/notification-policy";
 import { AccessService } from "../access/access.service";
 import {
   accessibleWhere,
@@ -370,6 +371,22 @@ export class ProblemsService {
     return toMaintenanceScooter(row);
   }
 
+  async creationScooters(userId: string) {
+    const snapshot = await this.access.getSnapshot(userId);
+    this.requireAll(snapshot, "problems.create");
+    const rows = await this.prisma.scooter.findMany({
+      where: {
+        AND: [
+          { deletedAt: null },
+          accessibleWhere(snapshot, "scooters.read", "Scooter"),
+        ],
+      },
+      select: maintenanceScooterSelect,
+      orderBy: { fleetNumber: "asc" },
+    });
+    return { items: rows.map(toMaintenanceScooter) };
+  }
+
   async create(userId: string, input: v1.problems.CreateProblemInput) {
     const initial = await this.access.getSnapshot(userId);
     this.requireAll(initial, "problems.create");
@@ -400,9 +417,24 @@ export class ProblemsService {
         });
         if (!scooter) throw new NotFoundException("Scooter not found");
       }
-      const assigneeIds =
-        input.assigneeIds ?? (input.assigneeId ? [input.assigneeId] : []);
-      if (assigneeIds.length) {
+      const assigneeIds = [
+        ...(input.assigneeIds ?? (input.assigneeId ? [input.assigneeId] : [])),
+      ];
+      const admin = snapshot.isSuperAdmin || snapshot.isAdmin;
+      if (
+        !admin &&
+        !snapshot.effectiveScopes["problems.assign"]?.includes("ALL")
+      ) {
+        if (assigneeIds.some((assigneeId) => assigneeId !== userId))
+          throw new ForbiddenException(
+            "You can only assign yourself when creating work",
+          );
+        if (!(await this.eligible(userId, tx)))
+          throw new ForbiddenException(
+            "Assigned-work permissions are required to create work",
+          );
+        assigneeIds.splice(0, assigneeIds.length, userId);
+      } else if (assigneeIds.length) {
         this.requireAll(snapshot, "problems.assign");
         for (const assigneeId of assigneeIds) {
           if (!(await this.eligible(assigneeId, tx, input.scooterId === null)))
@@ -843,16 +875,193 @@ export class ProblemsService {
       input.revision,
       "problems.resolve",
       AuditEventType.PROBLEM_RESOLVED,
-      (row) => {
+      (row, snapshot) => {
         if (!openStates.includes(row.status))
           throw new ConflictException("Problem is already closed");
+        const admin = snapshot.isSuperAdmin || snapshot.isAdmin;
+        const resolutionNotes = input.resolutionNotes?.trim() || null;
+        if (
+          !admin &&
+          !v1.problems.problemAssignees(row).some(({ id }) => id === userId)
+        )
+          throw new ForbiddenException(
+            "Only assigned workers can complete this task",
+          );
+        if (!admin && !resolutionNotes)
+          throw new BadRequestException({
+            code: "PROBLEM_RESOLUTION_NOTES_REQUIRED",
+            message: "Resolution notes are required",
+          });
         return {
           ...this.closeHold(row, userId),
           status: "resolved",
-          resolutionNotes: input.resolutionNotes,
+          resolutionNotes,
           resolvedAt: new Date(),
         };
       },
+    );
+  }
+
+  private requireReminderAdmin(snapshot: Snapshot) {
+    if (!snapshot.isSuperAdmin && !snapshot.isAdmin)
+      throw new ForbiddenException("Admin required");
+    this.requireAll(snapshot, "problems.assign");
+  }
+
+  private reminderWhere(
+    assigneeIds: string[],
+    since: Date,
+  ): Prisma.NotificationEventWhereInput {
+    return {
+      type: { in: ["issue.reminder", "todo.reminder"] },
+      createdAt: { gt: since },
+      OR: [
+        { assignedRecipientIds: { hasSome: assigneeIds } },
+        { adminRecipientIds: { hasSome: assigneeIds } },
+      ],
+    };
+  }
+
+  async reminderStatus(userId: string, id: string) {
+    const snapshot = await this.access.getSnapshot(userId);
+    this.requireReminderAdmin(snapshot);
+    const row = await this.prisma.scooterProblem.findFirst({
+      where: { AND: [{ id }, this.where(snapshot, "problems.assign")] },
+      include: problemInclude,
+    });
+    if (!row) throw new NotFoundException("Problem not found");
+    const [{ now }] = await this.prisma.$queryRaw<
+      { now: Date }[]
+    >`SELECT clock_timestamp() AS now`;
+    const ids = v1.problems.problemAssignees(row).map(({ id }) => id);
+    const events = ids.length
+      ? await this.prisma.notificationEvent.findMany({
+          where: this.reminderWhere(
+            ids,
+            new Date(now.getTime() - v1.problems.PROBLEM_REMINDER_COOLDOWN_MS),
+          ),
+          select: {
+            createdAt: true,
+            assignedRecipientIds: true,
+            adminRecipientIds: true,
+          },
+          orderBy: { createdAt: "desc" },
+        })
+      : [];
+    return {
+      serverNow: now.toISOString(),
+      items: ids.map((assigneeId) => {
+        const event = events.find((event) =>
+          [...event.assignedRecipientIds, ...event.adminRecipientIds].includes(
+            assigneeId,
+          ),
+        );
+        return {
+          assigneeId,
+          nextAllowedAt: event
+            ? new Date(
+                event.createdAt.getTime() +
+                  v1.problems.PROBLEM_REMINDER_COOLDOWN_MS,
+              ).toISOString()
+            : null,
+        };
+      }),
+    };
+  }
+
+  async remind(
+    userId: string,
+    id: string,
+    input: v1.problems.ProblemReminderInput,
+  ) {
+    this.requireReminderAdmin(await this.access.getSnapshot(userId));
+    return this.prisma.$transaction(
+      async (tx) => {
+        const reference = await tx.scooterProblem.findUnique({
+          where: { id },
+          select: { scooterId: true },
+        });
+        if (!reference) throw new NotFoundException("Problem not found");
+        if (reference.scooterId)
+          await tx.$queryRaw`SELECT id FROM "Scooter" WHERE id = ${reference.scooterId} FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM "ScooterProblem" WHERE id = ${id} FOR UPDATE`;
+        const snapshot = await this.access.getSnapshot(userId, tx);
+        this.requireReminderAdmin(snapshot);
+        const row = await tx.scooterProblem.findFirst({
+          where: { AND: [{ id }, this.where(snapshot, "problems.assign")] },
+          include: problemInclude,
+        });
+        if (!row) throw new NotFoundException("Problem not found");
+        if (!openStates.includes(row.status))
+          throw new ConflictException("Problem is already closed");
+        if (row.revision !== input.revision)
+          throw new ConflictException("Problem changed; reload before saving");
+        if (
+          !v1.problems
+            .problemAssignees(row)
+            .some(({ id }) => id === input.assigneeId)
+        )
+          throw new ConflictException(
+            "User is no longer assigned to this task",
+          );
+        if (
+          !(await this.eligible(input.assigneeId, tx, row.scooterId === null))
+        )
+          throw new ConflictException("Assignee is not eligible for this work");
+        const recipient = await this.access.getSnapshot(input.assigneeId, tx);
+        if (
+          !hasNotificationScope(recipient, "ALL") &&
+          !(row.scooterId && hasNotificationScope(recipient, "ASSIGNED"))
+        )
+          throw new ConflictException(
+            "Assignee cannot receive task notifications",
+          );
+        // Recipient-wide lock: different tasks and admins share the same rolling minute.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`problem-reminder:${input.assigneeId}`}, 0))`;
+        const [{ now }] = await tx.$queryRaw<
+          { now: Date }[]
+        >`SELECT clock_timestamp() AS now`;
+        const latest = await tx.notificationEvent.findFirst({
+          where: this.reminderWhere(
+            [input.assigneeId],
+            new Date(now.getTime() - v1.problems.PROBLEM_REMINDER_COOLDOWN_MS),
+          ),
+          orderBy: { createdAt: "desc" },
+          select: { createdAt: true },
+        });
+        if (latest)
+          return {
+            sent: false,
+            serverNow: now.toISOString(),
+            nextAllowedAt: new Date(
+              latest.createdAt.getTime() +
+                v1.problems.PROBLEM_REMINDER_COOLDOWN_MS,
+            ).toISOString(),
+          };
+        await publishNotificationEvent(tx, {
+          type: row.scooterId ? "issue.reminder" : "todo.reminder",
+          category: "jobs",
+          actorId: userId,
+          subjectType: row.scooterId ? "issue" : "todo",
+          subjectId: id,
+          subjectLabel: row.title,
+          permissionKey: "problems.read",
+          problemId: id,
+          scooterId: row.scooterId,
+          targetPath: `${row.scooterId ? "/problems" : "/todos"}/${encodeURIComponent(id)}`,
+          assignedIds: [input.assigneeId],
+          recipientIds: [input.assigneeId],
+          createdAt: now,
+        });
+        return {
+          sent: true,
+          serverNow: now.toISOString(),
+          nextAllowedAt: new Date(
+            now.getTime() + v1.problems.PROBLEM_REMINDER_COOLDOWN_MS,
+          ).toISOString(),
+        };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted },
     );
   }
 

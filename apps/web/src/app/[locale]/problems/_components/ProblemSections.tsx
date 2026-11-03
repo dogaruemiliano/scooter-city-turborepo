@@ -40,6 +40,7 @@ type Section = v1.problems.Problem["sections"][number];
 
 export function ProblemSections({
   problem,
+  todo = false,
   editable,
   maySaveLocation,
   busy,
@@ -47,6 +48,7 @@ export function ProblemSections({
   onBusyChange,
 }: {
   problem: ProblemSectionData;
+  todo?: boolean;
   editable: boolean;
   maySaveLocation: boolean;
   busy: boolean;
@@ -86,6 +88,7 @@ export function ProblemSections({
           <ProblemChecklist
             key={kind}
             kind={kind}
+            todo={todo}
             initialOpen={creatingChecklist === kind && !has(kind)}
             onEditorClose={() => setCreatingChecklist(null)}
             problem={problem}

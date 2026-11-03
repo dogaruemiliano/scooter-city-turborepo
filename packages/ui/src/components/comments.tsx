@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "./avatar";
 import { Label } from "./label";
 import { InputGroup, InputGroupTextarea } from "./input-group";
 import { CircleCheck, RotateCcw, Send } from "lucide-react";
-import { breakpoints } from "@repo/theme";
+import { breakpoints, spacing } from "@repo/theme";
 import { SaveButton, type SaveButtonProps } from "./save-button";
 
 /** A conversation surface. Data fetching, ordering and pagination belong to the caller. */
@@ -186,6 +186,16 @@ function CommentComposer({
       return;
     }
     const initialHeight = window.innerHeight;
+    const isIOS =
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    // Safari freezes the OS version in its UA. contrast-color shipped with
+    // WebKit 26, when iOS introduced the floating form toolbar. Its geometry
+    // isn't exposed to web content; older iOS already insets the viewport.
+    const accessoryClearance =
+      isIOS && window.CSS?.supports("color", "contrast-color(currentColor)")
+        ? spacing.iosKeyboardAccessoryClearance
+        : 0;
     const update = () => {
       const inset = Math.max(
         0,
@@ -194,8 +204,9 @@ function CommentComposer({
       setKeyboardInset(
         window.innerWidth < breakpoints.md &&
           viewport.scale === 1 &&
-          (inset > 0 || viewport.height < initialHeight)
-          ? inset
+          Math.max(inset, initialHeight - viewport.height) >=
+            spacing.keyboardDockThreshold
+          ? inset + accessoryClearance
           : null,
       );
     };

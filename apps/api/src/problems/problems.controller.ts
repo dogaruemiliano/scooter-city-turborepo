@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Param,
   Patch,
   Post,
@@ -50,6 +51,18 @@ class UpdateInput extends createZodDto(v1.problems.updateProblemInputSchema) {}
 class ResolveInput extends createZodDto(
   v1.problems.resolveProblemInputSchema,
 ) {}
+class ReminderInput extends createZodDto(
+  v1.problems.problemReminderInputSchema,
+) {}
+class ReminderStatus extends createZodDto(
+  v1.problems.problemReminderStatusSchema,
+) {}
+class ReminderResult extends createZodDto(
+  v1.problems.problemReminderResultSchema,
+) {}
+class CreationScooters extends createZodDto(
+  v1.problems.problemCreationScootersSchema,
+) {}
 class AssignInput extends createZodDto(v1.problems.assignProblemInputSchema) {}
 class PriorityInput extends createZodDto(
   v1.problems.prioritizeProblemInputSchema,
@@ -91,6 +104,13 @@ export class ProblemsController {
   @ZodResponse({ type: FilterOptions })
   filterOptions(@CurrentUser() user: AuthPrincipal) {
     return this.problems.filterOptions(user.id);
+  }
+
+  @Get("creation-scooters")
+  @RequireAllScope("problems.create")
+  @ZodResponse({ type: CreationScooters })
+  creationScooters(@CurrentUser() user: AuthPrincipal) {
+    return this.problems.creationScooters(user.id);
   }
 
   @Get("eligible-assignees")
@@ -270,6 +290,25 @@ export class ProblemsController {
     @Body() input: ResolveInput,
   ) {
     return this.problems.resolve(user.id, id, input);
+  }
+
+  @Get(":id/reminders")
+  @RequireAllScope("problems.assign")
+  @ZodResponse({ type: ReminderStatus })
+  reminderStatus(@CurrentUser() user: AuthPrincipal, @Param("id") id: string) {
+    return this.problems.reminderStatus(user.id, id);
+  }
+
+  @Post(":id/reminders")
+  @HttpCode(200)
+  @RequireAllScope("problems.assign")
+  @ZodResponse({ type: ReminderResult })
+  remind(
+    @CurrentUser() user: AuthPrincipal,
+    @Param("id") id: string,
+    @Body() input: ReminderInput,
+  ) {
+    return this.problems.remind(user.id, id, input);
   }
 
   @Post(":id/reopen")

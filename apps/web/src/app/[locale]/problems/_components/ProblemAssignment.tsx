@@ -19,6 +19,12 @@ import { CheckIcon, PencilIcon } from "lucide-react";
 import type { AssigneeOption } from "./AssigneeSelect";
 import { AssigneeUserCard, AssigneeUserRow } from "./AssigneeUserCard";
 import { memberName } from "../_lib/member-name";
+import { useSession } from "@/components/auth/SessionProvider";
+import { Feedback } from "@/components/WorkspaceForm";
+import {
+  AssigneeReminderButton,
+  useAssigneeReminders,
+} from "./AssigneeReminders";
 
 export function ProblemAssignment({
   problem,
@@ -32,6 +38,7 @@ export function ProblemAssignment({
   onRetry,
   onAssign,
   onClaim,
+  onReloadLatest,
   saveError,
 }: {
   problem: v1.problems.Problem;
@@ -46,6 +53,7 @@ export function ProblemAssignment({
   onAssign: (ids: string[]) => Promise<boolean>;
   saveError: string | null;
   onClaim: () => void;
+  onReloadLatest?: () => void;
 }) {
   const formAction = useFormAction();
 
@@ -57,6 +65,13 @@ export function ProblemAssignment({
   const assigned = v1.problems.problemAssignees(problem);
   const editable =
     problem.status === "open" || problem.status === "in_progress";
+  const { user } = useSession();
+  const mayRemind =
+    !!(user?.isAdmin || user?.isSuperAdmin) &&
+    mayAssign &&
+    editable &&
+    assigned.length > 0;
+  const reminders = useAssigneeReminders(problem, mayRemind);
   const options = [
     ...members,
     ...assigned.filter(
@@ -119,6 +134,15 @@ export function ProblemAssignment({
                       {t("problems.you")}
                     </span>
                   ) : null}
+                  {mayRemind ? (
+                    <AssigneeReminderButton
+                      name={memberName(member)}
+                      pending={reminders.pendingId === member.id}
+                      disabled={busy || reminders.pending || reminders.disabled}
+                      secondsRemaining={reminders.secondsRemaining(member.id)}
+                      onClick={() => void reminders.send(member.id)}
+                    />
+                  ) : null}
                 </span>
               }
             />
@@ -129,6 +153,24 @@ export function ProblemAssignment({
           {t("problems.nobodyAssigned")}
         </p>
       )}
+      {mayRemind ? (
+        <>
+          <Feedback error={reminders.error} success={reminders.notice} />
+          {reminders.error ? (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={reminders.pending}
+              onClick={() => {
+                reminders.reload();
+                onReloadLatest?.();
+              }}
+            >
+              {t("problems.reloadLatest")}
+            </Button>
+          ) : null}
+        </>
+      ) : null}
       {problem.assigneeNeedsReassignment ? (
         <p role="status" className="text-sm font-medium text-destructive">
           {t("problems.reassignRequired")}

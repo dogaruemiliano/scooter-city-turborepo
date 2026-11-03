@@ -74,13 +74,13 @@ test("report requires title and repair difficulty, with optional description and
       false,
     );
 });
-test("resolution and comments reject empty content and arbitrary state fields", () => {
+test("resolution accepts optional admin notes while comments still reject empty content", () => {
   assert.equal(
     v1.problems.resolveProblemInputSchema.safeParse({
       revision: 1,
       resolutionNotes: " ",
     }).success,
-    false,
+    true,
   );
   assert.equal(
     v1.problems.problemCommentInputSchema.safeParse({ revision: 1, body: " " })

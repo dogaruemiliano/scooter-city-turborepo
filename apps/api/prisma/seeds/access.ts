@@ -35,6 +35,7 @@ export const initialRoles: {
       { permissionKey: "problems.read", scopes: ["ASSIGNED", "AVAILABLE"] },
       { permissionKey: "problems.claim", scopes: ["AVAILABLE"] },
       { permissionKey: "problems.update", scopes: ["ASSIGNED"] },
+      { permissionKey: "problems.create", scopes: ["ALL"] },
       { permissionKey: "problems.resolve", scopes: ["ASSIGNED"] },
       { permissionKey: "scooters.read", scopes: ["ASSIGNED"] },
     ],

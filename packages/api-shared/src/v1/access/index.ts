@@ -85,7 +85,15 @@ export const permissionCatalog = [
     "finance.operations.read",
   ]),
   definition("problems.read", ["ASSIGNED", "AVAILABLE", "ALL"]),
-  definition("problems.create", all, ["problems.read", "scooters.read"]),
+  definition(
+    "problems.create",
+    all,
+    [],
+    [
+      { key: "problems.read", anyOf: ["ASSIGNED", "ALL"] },
+      { key: "scooters.read", anyOf: ["ASSIGNED", "ALL"] },
+    ],
+  ),
   definition("problems.update", ["ASSIGNED", "ALL"], ["problems.read"]),
   definition("problems.resolve", ["ASSIGNED", "ALL"], ["problems.read"]),
   definition(

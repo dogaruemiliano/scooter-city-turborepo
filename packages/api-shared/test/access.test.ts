@@ -2,6 +2,26 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { v1 } from "../src";
 
+test("issue creation can depend on assigned reads without granting full fleet access", () => {
+  assert.deepEqual(
+    v1.access.missingPermissionPrerequisites({
+      "problems.create": ["ALL"],
+      "problems.read": ["ASSIGNED"],
+      "scooters.read": ["ASSIGNED"],
+    }),
+    [],
+  );
+  assert.ok(
+    v1.access
+      .missingPermissionPrerequisites({
+        "problems.create": ["ALL"],
+        "problems.read": ["AVAILABLE"],
+        "scooters.read": ["ASSIGNED"],
+      })
+      .some((key) => key.startsWith("problems.create:")),
+  );
+});
+
 test("access requests accept at most one base role", () => {
   assert.deepEqual(v1.access.BASE_ROLE_SLUGS, [
     "admin",
