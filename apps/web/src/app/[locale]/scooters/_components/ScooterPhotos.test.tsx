@@ -693,10 +693,11 @@ it("restores private photo previews and preserves completed upload tokens and se
   vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:restored-photo");
   const drafts = vi.fn();
   const snapshots = vi.fn();
-  const { contentUrl: _contentUrl, ...metadata } = photo("one", {
+  const metadata = photo("one", {
     caption: "Restored cover",
     isPublic: true,
   });
+  Reflect.deleteProperty(metadata, "contentUrl");
   render(
     <NextIntlClientProvider locale="en" messages={messages.en}>
       <ScooterPhotoGallery

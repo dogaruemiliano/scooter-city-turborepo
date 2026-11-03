@@ -134,7 +134,9 @@ describe("Access management HTTP contracts (e2e)", () => {
     }
     app.enableVersioning({ type: VersioningType.URI, defaultVersion: "1" });
     app.use(cookieParser());
-    await app.init();
+    // Reuse one listener for the route matrix instead of opening and closing
+    // an ephemeral server for every Supertest request.
+    await app.listen(0, "127.0.0.1");
     prisma = app.get(PrismaService);
     core = app.get(CoreAuthService);
     mailer = app.get(MailerService);

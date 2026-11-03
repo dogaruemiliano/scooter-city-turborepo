@@ -1309,7 +1309,14 @@ describe("Scooters HTTP surface (e2e)", () => {
       await req()
         .post(v1.scooters.ROUTES.create)
         .set("Cookie", [`access_token=${otherAdmin.accessToken}`])
-        .send(scooterInput({ vin: foreignVin, documentDrafts }))
+        .send(
+          scooterInput({
+            vin: foreignVin,
+            registrationType: "national",
+            registrationNumber: "B 987 DOC",
+            documentDrafts,
+          }),
+        )
         .expect(400);
       expect(
         await prisma.scooter.findUnique({ where: { vin: foreignVin } }),
@@ -1317,7 +1324,13 @@ describe("Scooters HTTP surface (e2e)", () => {
       const created = await req()
         .post(v1.scooters.ROUTES.create)
         .set("Cookie", cookie)
-        .send(scooterInput({ documentDrafts }));
+        .send(
+          scooterInput({
+            registrationType: "national",
+            registrationNumber: "B 988 DOC",
+            documentDrafts,
+          }),
+        );
       expect(created.status).toBe(201);
       const id = v1.scooters.scooterSchema.parse(created.body).id;
       const detail = await req()
@@ -1355,7 +1368,14 @@ describe("Scooters HTTP surface (e2e)", () => {
       await req()
         .post(v1.scooters.ROUTES.create)
         .set("Cookie", cookie)
-        .send(scooterInput({ vin: reusedVin, documentDrafts }))
+        .send(
+          scooterInput({
+            vin: reusedVin,
+            registrationType: "national",
+            registrationNumber: "B 989 DOC",
+            documentDrafts,
+          }),
+        )
         .expect(400);
       expect(
         await prisma.scooter.findUnique({ where: { vin: reusedVin } }),
