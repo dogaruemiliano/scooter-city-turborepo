@@ -9,6 +9,7 @@ import { setRequestLocale } from "next-intl/server";
 
 import { WorkspaceNotifications } from "../../components/WorkspaceNotifications";
 import { AppShell } from "../../components/AppShell";
+import { ActivityNotificationsProvider } from "../../components/notifications/ActivityNotificationsProvider";
 import { SessionProvider } from "../../components/auth/SessionProvider";
 import { meFromApi } from "../../lib/auth-server";
 import { pwaMetadata } from "../../lib/pwa";
@@ -95,9 +96,11 @@ export default async function RootLayout({
             <WorkspaceNotifications>
               <TooltipProvider>
                 <SessionProvider initialUser={initialUser}>
-                  <AppShell initialThemePreference={initialThemePreference}>
-                    {children}
-                  </AppShell>
+                  <ActivityNotificationsProvider>
+                    <AppShell initialThemePreference={initialThemePreference}>
+                      {children}
+                    </AppShell>
+                  </ActivityNotificationsProvider>
                 </SessionProvider>
               </TooltipProvider>
             </WorkspaceNotifications>

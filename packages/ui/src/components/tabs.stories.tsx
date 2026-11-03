@@ -91,3 +91,21 @@ export const Vertical: Story = {
     </Tabs>
   ),
 };
+
+/** Labels keep their readable width; narrow lists scroll instead of overlapping. */
+export const LongLabels: Story = {
+  render: () => (
+    <div className="w-72 max-w-full">
+      <Tabs defaultValue="inbox">
+        <TabsList variant="line">
+          <TabsTrigger value="inbox">Mesaje primite</TabsTrigger>
+          <TabsTrigger value="activity">Istoricul activității</TabsTrigger>
+          <TabsTrigger value="settings">Setări notificări</TabsTrigger>
+        </TabsList>
+        <TabsContent value="inbox">Recent notifications.</TabsContent>
+        <TabsContent value="activity">Business activity history.</TabsContent>
+        <TabsContent value="settings">Delivery preferences.</TabsContent>
+      </Tabs>
+    </div>
+  ),
+};

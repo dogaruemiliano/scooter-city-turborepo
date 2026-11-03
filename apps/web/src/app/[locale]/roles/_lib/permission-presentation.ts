@@ -52,6 +52,8 @@ export const permissionActions = {
 
 /** Explicit coverage prevents new business actions from silently getting a CRUD icon. */
 export const permissionActionKeys = {
+  "notifications.receive": "view",
+  "notifications.activity.read": "audit",
   "users.read": "view",
   "users.invite": "invite",
   "users.status.update": "access",

@@ -13,6 +13,7 @@ import {
   getLocaleFromPathname,
 } from "../../i18n/paths";
 import { webApi } from "../../lib/api";
+import { unsubscribeBrowserPush } from "../notifications/push-client";
 
 export interface LogoutButtonProps {
   children?: ReactNode;
@@ -28,6 +29,8 @@ export function useLogout() {
   async function logout(): Promise<void> {
     setBusy(true);
     try {
+      // Local unsubscribe is useful even if the logout response is lost.
+      await unsubscribeBrowserPush().catch(() => {});
       await webApi.fetch(v1.auth.ROUTES.logout, z.void(), { method: "POST" });
     } finally {
       setUser(null);

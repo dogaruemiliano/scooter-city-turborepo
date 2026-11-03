@@ -4,6 +4,8 @@ import { v1 } from "@repo/api-shared";
 import { createZodDto, ZodResponse } from "nestjs-zod";
 import { RequireAllScope } from "../access/access.decorators";
 import { ScooterItpService } from "./scooter-itp.service";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import type { AuthPrincipal } from "../auth/auth.types";
 
 class ScooterItpInput extends createZodDto(v1.scooters.scooterItpInputSchema) {}
 class ScooterItpInspection extends createZodDto(
@@ -28,7 +30,11 @@ export class ScooterItpController {
   @Post()
   @RequireAllScope("scooters.update", "scooter_documents.read")
   @ZodResponse({ status: 201, type: ScooterItpInspection })
-  create(@Param("id") id: string, @Body() input: ScooterItpInput) {
-    return this.inspections.create(id, input);
+  create(
+    @Param("id") id: string,
+    @Body() input: ScooterItpInput,
+    @CurrentUser() user: AuthPrincipal,
+  ) {
+    return this.inspections.create(id, input, user.id);
   }
 }

@@ -31,6 +31,7 @@ export const appShellCatalog = {
       companyAssociates: "Associates",
     },
     pages: {
+      notifications: "Notifications",
       dashboard: "Scooter City",
       finance: "Finance",
       financeExpenses: "Expenses",
@@ -98,6 +99,7 @@ export const appShellCatalog = {
       companyAssociates: "Asociați",
     },
     pages: {
+      notifications: "Notificări",
       dashboard: "Scooter City",
       finance: "Finanțe",
       financeExpenses: "Cheltuieli",

@@ -8,11 +8,14 @@ function setup() {
   const tx = {
     $queryRaw: jest.fn().mockResolvedValue([]),
     user: {
+      findMany: jest.fn().mockResolvedValue([]),
+      findUnique: jest.fn().mockResolvedValue(null),
       findFirst: jest
         .fn()
         .mockResolvedValue({ avatar: { id: "old", storageKey: "old-key" } }),
       update: jest.fn(),
     },
+    notificationEvent: { create: jest.fn().mockResolvedValue({ id: "event" }) },
     mediaAsset: {
       create: jest.fn().mockResolvedValue({ id: "new" }),
       update: jest.fn(),
@@ -85,6 +88,7 @@ describe("UserAvatarService", () => {
       data: { deletedAt: expect.any(Date) as unknown },
     });
     expect(storage.deleteImage).toHaveBeenCalledWith("old-key");
+    expect(tx.notificationEvent.create).toHaveBeenCalledTimes(1);
   });
   it("cleans up the new object when persistence fails", async () => {
     const { service, prisma, storage } = setup();

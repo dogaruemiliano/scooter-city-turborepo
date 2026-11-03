@@ -4,6 +4,8 @@ import { v1 } from "@repo/api-shared";
 import { createZodDto, ZodResponse } from "nestjs-zod";
 import { RequireAllScope } from "../access/access.decorators";
 import { ScooterInsuranceService } from "./scooter-insurance.service";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import type { AuthPrincipal } from "../auth/auth.types";
 
 class InsuranceInput extends createZodDto(
   v1.scooters.scooterInsuranceSaveSchema,
@@ -38,8 +40,14 @@ export class ScooterInsuranceController {
     @Param("id") id: string,
     @Param("policyId") policyId: string,
     @Body() input: InsuranceDelete,
+    @CurrentUser() user: AuthPrincipal,
   ) {
-    return this.insurance.delete(id, policyId, input.expectedUpdatedAt);
+    return this.insurance.delete(
+      id,
+      policyId,
+      input.expectedUpdatedAt,
+      user.id,
+    );
   }
   @Patch()
   @RequireAllScope(
@@ -48,7 +56,11 @@ export class ScooterInsuranceController {
     "scooter_documents.read",
   )
   @ZodResponse({ type: InsuranceList })
-  update(@Param("id") id: string, @Body() input: InsuranceInput) {
-    return this.insurance.update(id, input);
+  update(
+    @Param("id") id: string,
+    @Body() input: InsuranceInput,
+    @CurrentUser() user: AuthPrincipal,
+  ) {
+    return this.insurance.update(id, input, user.id);
   }
 }

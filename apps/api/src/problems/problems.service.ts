@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { v1 } from "@repo/api-shared";
+import { publishNotificationEvent } from "../notifications/notification-events";
 import { AccessService } from "../access/access.service";
 import {
   accessibleWhere,
@@ -630,6 +631,8 @@ export class ProblemsService {
             difficulty: row.difficulty,
             blocksUsage: row.blocksUsage,
             resolutionNotes: row.resolutionNotes,
+            workNotes: row.workNotes,
+            photos: row.photos.map((photo) => photo.id),
           },
           after: {
             status: updated.status,
@@ -648,6 +651,7 @@ export class ProblemsService {
             blocksUsage: updated.blocksUsage,
             resolutionNotes: updated.resolutionNotes,
             workNotes: updated.workNotes,
+            photos: updated.photos.map((photo) => photo.id),
           },
         },
       });
@@ -789,11 +793,27 @@ export class ProblemsService {
     };
   }
 
-  async saveLocation(input: { name: string; address: string }) {
-    return this.prisma.businessLocation.upsert({
-      where: { name_address: input },
-      create: input,
-      update: {},
+  async saveLocation(
+    input: { name: string; address: string },
+    actorId?: string,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${JSON.stringify(input)}, 0))`;
+      const existing = await tx.businessLocation.findUnique({
+        where: { name_address: input },
+      });
+      if (existing) return existing;
+      const location = await tx.businessLocation.create({ data: input });
+      await publishNotificationEvent(tx, {
+        type: "location.created",
+        category: "other",
+        actorId,
+        subjectType: "location",
+        subjectId: location.id,
+        subjectLabel: location.name,
+        permissionKey: "problems.read",
+      });
+      return location;
     });
   }
 

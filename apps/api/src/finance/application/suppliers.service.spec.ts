@@ -11,18 +11,24 @@ describe("SuppliersService", () => {
   it("normalizes unique fields and derives VAT payer status from the CIF prefix", async () => {
     const { repository, service } = setup();
 
-    const result = await service.create({
-      name: "  Rotakt S.R.L. ",
-      taxIdentifier: "C.F. RO 6334441",
-    });
+    const result = await service.create(
+      {
+        name: "  Rotakt S.R.L. ",
+        taxIdentifier: "C.F. RO 6334441",
+      },
+      "admin",
+    );
 
-    expect(repository.createSupplier).toHaveBeenCalledWith({
-      name: "  Rotakt S.R.L. ",
-      normalizedName: "ROTAKT SRL",
-      taxIdentifier: "C.F. RO 6334441",
-      normalizedTaxIdentifier: "6334441",
-      isVatPayer: true,
-    });
+    expect(repository.createSupplier).toHaveBeenCalledWith(
+      {
+        name: "  Rotakt S.R.L. ",
+        normalizedName: "ROTAKT SRL",
+        taxIdentifier: "C.F. RO 6334441",
+        normalizedTaxIdentifier: "6334441",
+        isVatPayer: true,
+      },
+      "admin",
+    );
     expect(result).toEqual(
       expect.objectContaining({
         name: "  Rotakt S.R.L. ",
@@ -45,6 +51,7 @@ describe("SuppliersService", () => {
         normalizedTaxIdentifier: "6334441",
         isVatPayer: false,
       }),
+      undefined,
     );
   });
 

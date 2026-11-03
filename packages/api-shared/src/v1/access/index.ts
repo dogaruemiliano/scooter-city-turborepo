@@ -26,6 +26,8 @@ const definition = <K extends string>(
   descriptionKey: `access.descriptions.${key}`,
 });
 export const permissionCatalog = [
+  definition("notifications.receive", ["ASSIGNED", "ALL"]),
+  definition("notifications.activity.read"),
   definition("users.read"),
   definition("users.invite", all, ["users.read"]),
   definition("users.status.update", all, ["users.read"]),

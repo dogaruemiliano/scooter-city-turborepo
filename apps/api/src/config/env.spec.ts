@@ -15,6 +15,46 @@ function validEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
 }
 
 describe("environment schema", () => {
+  it("keeps push unconfigured until a complete VAPID tuple is supplied", () => {
+    const empty = {
+      NOTIFICATIONS_VAPID_PUBLIC_KEY: "",
+      NOTIFICATIONS_VAPID_PRIVATE_KEY: "",
+      NOTIFICATIONS_VAPID_SUBJECT: "",
+    };
+    expect(loadEnv(validEnv(empty)).NOTIFICATIONS_VAPID_PUBLIC_KEY).toBe("");
+    expect(() =>
+      loadEnv(
+        validEnv({ ...empty, NOTIFICATIONS_VAPID_PUBLIC_KEY: "B".repeat(87) }),
+      ),
+    ).toThrow("NOTIFICATIONS_VAPID_PRIVATE_KEY");
+    expect(
+      loadEnv(
+        validEnv({
+          NOTIFICATIONS_VAPID_PUBLIC_KEY: "B".repeat(87),
+          NOTIFICATIONS_VAPID_PRIVATE_KEY: "a".repeat(43),
+          NOTIFICATIONS_VAPID_SUBJECT: "mailto:operations@example.test",
+        }),
+      ).NOTIFICATIONS_VAPID_SUBJECT,
+    ).toBe("mailto:operations@example.test");
+  });
+
+  it.each([
+    { NOTIFICATIONS_VAPID_PUBLIC_KEY: "invalid" },
+    { NOTIFICATIONS_VAPID_PRIVATE_KEY: "invalid" },
+    { NOTIFICATIONS_VAPID_SUBJECT: "http://localhost/contact" },
+  ])("rejects invalid VAPID configuration %j", (invalid) => {
+    expect(() =>
+      loadEnv(
+        validEnv({
+          NOTIFICATIONS_VAPID_PUBLIC_KEY: "B".repeat(87),
+          NOTIFICATIONS_VAPID_PRIVATE_KEY: "a".repeat(43),
+          NOTIFICATIONS_VAPID_SUBJECT: "mailto:operations@example.test",
+          ...invalid,
+        }),
+      ),
+    ).toThrow("NOTIFICATIONS_VAPID");
+  });
+
   it("keeps background extraction disabled until explicitly enabled", () => {
     const source = validEnv();
     delete source.SCOOTER_DOCUMENT_EXTRACTION_JOBS_ENABLED;

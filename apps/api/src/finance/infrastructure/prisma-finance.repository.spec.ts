@@ -28,6 +28,7 @@ describe("PrismaFinanceRepository expense receipt claims", () => {
       { draftUploadId: "upload-two", storageKey: "receipts/two.jpg" },
     ];
     await repository.createPostedExpense(input);
+    expect(tx.notificationEvent.create).toHaveBeenCalledTimes(1);
     expect(tx.draftUpload.updateMany).toHaveBeenCalledTimes(2);
     expect(tx.financialDocument.createMany).toHaveBeenCalledWith({
       data: expect.arrayContaining([
@@ -51,6 +52,7 @@ describe("PrismaFinanceRepository expense receipt claims", () => {
     );
     expect(tx.journalEntry.create).not.toHaveBeenCalled();
     expect(tx.financialOperation.update).not.toHaveBeenCalled();
+    expect(tx.notificationEvent.create).not.toHaveBeenCalled();
   });
 
   it("attaches a direct upload to the first invoice and claims it atomically", async () => {
@@ -179,6 +181,11 @@ function setupRepository(claimCount: number) {
     return Promise.resolve({ count: claimCount });
   });
   const tx = {
+    user: {
+      findMany: jest.fn().mockResolvedValue([]),
+      findUnique: jest.fn().mockResolvedValue(null),
+    },
+    notificationEvent: { create: jest.fn().mockResolvedValue({ id: "event" }) },
     financialOperation: {
       create: jest.fn().mockResolvedValue({ id: "operation-1" }),
       update: jest.fn().mockResolvedValue({ id: "operation-1" }),

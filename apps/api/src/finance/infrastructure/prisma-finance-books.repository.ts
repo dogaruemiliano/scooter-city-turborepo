@@ -3,6 +3,7 @@ import { v1 } from "@repo/api-shared";
 
 import { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
+import { publishNotificationEvent } from "../../notifications/notification-events";
 import {
   FinanceNotFoundError,
   FinanceValidationError,
@@ -109,6 +110,16 @@ export class PrismaFinanceBooksRepository {
                 .join(" ") || member.associate.email,
           });
         }
+        await publishNotificationEvent(tx, {
+          type: "finance.book.created",
+          category: "other",
+          actorId,
+          subjectType: "finance",
+          subjectId: book.id,
+          subjectLabel: book.name,
+          permissionKey: "super_admin",
+          targetPath: "/finance/settings",
+        });
         return tx.financeBook.findUniqueOrThrow({
           where: { id: book.id },
           include: BOOK_INCLUDE,
@@ -118,11 +129,35 @@ export class PrismaFinanceBooksRepository {
     );
   }
 
-  update(bookId: string, input: v1.finance.UpdateFinanceBookInput) {
-    return this.prisma.financeBook.update({
-      where: { id: bookId },
-      data: nameData(input.names),
-      include: BOOK_INCLUDE,
+  update(
+    bookId: string,
+    input: v1.finance.UpdateFinanceBookInput,
+    actorId?: string,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const before = await tx.financeBook.findUnique({ where: { id: bookId } });
+      const book = await tx.financeBook.update({
+        where: { id: bookId },
+        data: nameData(input.names),
+        include: BOOK_INCLUDE,
+      });
+      if (
+        before?.name !== book.name ||
+        JSON.stringify(before?.nameTranslations) !==
+          JSON.stringify(book.nameTranslations)
+      )
+        await publishNotificationEvent(tx, {
+          type: "finance.book.updated",
+          category: "other",
+          actorId,
+          subjectType: "finance",
+          subjectId: bookId,
+          subjectLabel: book.name,
+          permissionKey: "super_admin",
+          targetPath: "/finance/settings",
+          changes: ["name"],
+        });
+      return book;
     });
   }
 }

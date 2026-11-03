@@ -131,8 +131,11 @@ export class ProblemsController {
   @Post("locations")
   @RequireAllScope("problems.update")
   @ZodResponse({ status: 201, type: Location })
-  saveLocation(@Body() input: LocationInput) {
-    return this.problems.saveLocation(input);
+  saveLocation(
+    @Body() input: LocationInput,
+    @CurrentUser() user: AuthPrincipal,
+  ) {
+    return this.problems.saveLocation(input, user.id);
   }
 
   @Get(":id/activity")

@@ -127,7 +127,10 @@ export class ScootersController {
     summary: "Soft-delete one active scooter inventory record",
   })
   @ApiNoContentResponse()
-  async delete(@Param("id") id: string): Promise<void> {
-    await this.scooters.softDelete(id);
+  async delete(
+    @Param("id") id: string,
+    @CurrentUser() user: AuthPrincipal,
+  ): Promise<void> {
+    await this.scooters.softDelete(id, user.id);
   }
 }

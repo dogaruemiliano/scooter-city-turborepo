@@ -66,6 +66,7 @@ import {
 } from "@repo/ui/components/sidebar";
 
 import { useLogout } from "./auth/LogoutButton";
+import { NotificationsBell } from "./notifications/NotificationsBell";
 import { useSession } from "./auth/SessionProvider";
 import { LanguageMenuSub } from "./LanguageSwitcher";
 import {
@@ -196,6 +197,7 @@ const ALL_NAVIGATION_HREFS: readonly string[] = [
 
 const PAGE_TITLES: Record<string, string> = {
   "/": "dashboard",
+  "/notifications": "notifications",
   "/account/settings": "accountSettings",
   "/finance": "finance",
   "/finance/expenses": "financeExpenses",
@@ -335,6 +337,7 @@ function AppShellContent({
             <span className="min-w-0 flex-1 truncate text-sm font-semibold">
               {pageTitle}
             </span>
+            <NotificationsBell />
             <div
               ref={setPageHeaderActionsTarget}
               className="ml-auto flex shrink-0 gap-2 md:hidden"

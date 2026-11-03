@@ -22,6 +22,7 @@ export class CompanyIdentityService {
 
   async upsert(
     input: v1.finance.UpsertFinanceLegalIdentityInput,
+    actorId?: string,
   ): Promise<v1.finance.FinanceLegalIdentity> {
     const book = await this.repository.findCompanyBook();
     if (!book) {
@@ -38,15 +39,18 @@ export class CompanyIdentityService {
       );
     }
 
-    const identity = await this.repository.upsertCompanyIdentity({
-      bookId: book.id,
-      legalName: input.legalName,
-      normalizedLegalName,
-      taxIdentifier: input.taxIdentifier,
-      normalizedTaxIdentifier,
-      nameAliases: uniqueAliases(input.nameAliases, input.legalName),
-      countryCode: input.countryCode,
-    });
+    const identity = await this.repository.upsertCompanyIdentity(
+      {
+        bookId: book.id,
+        legalName: input.legalName,
+        normalizedLegalName,
+        taxIdentifier: input.taxIdentifier,
+        normalizedTaxIdentifier,
+        nameAliases: uniqueAliases(input.nameAliases, input.legalName),
+        countryCode: input.countryCode,
+      },
+      actorId,
+    );
     return toIdentity(identity);
   }
 }

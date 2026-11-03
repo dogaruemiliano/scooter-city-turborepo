@@ -15,8 +15,12 @@ export class CompanyAssociatesService {
 
   async update(
     input: v1.finance.UpdateCompanyAssociatesInput,
+    actorId?: string,
   ): Promise<v1.finance.CompanyAssociates> {
-    const record = await this.repository.updateCompanyAssociates(input);
+    const record = await this.repository.updateCompanyAssociates(
+      input,
+      actorId,
+    );
     return toResponse(record);
   }
 }
