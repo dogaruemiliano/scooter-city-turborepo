@@ -53,6 +53,7 @@ export function ProblemDetailScreen({ id }: { id: string }) {
   const problem = remote.data;
   return (
     <PageLayout>
+      <PageTitleOverride title="" />
       <Feedback error={remote.error} />
       {remote.error ? (
         <Button
@@ -70,7 +71,6 @@ export function ProblemDetailScreen({ id }: { id: string }) {
       ) : null}
       {problem ? (
         <div className="mx-auto flex min-w-0 w-full max-w-(--container-form-columns) flex-col gap-8">
-          <PageTitleOverride title={problem.title} />
           <div className="flex flex-col gap-3">
             <div
               ref={setActionsTarget}
