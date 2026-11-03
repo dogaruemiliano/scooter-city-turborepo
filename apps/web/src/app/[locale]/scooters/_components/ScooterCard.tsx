@@ -229,6 +229,9 @@ export function ScooterCard({
             <p className="mt-3 break-words text-sm leading-snug text-muted-foreground">
               {model}
             </p>
+            <p className="mt-1 font-mono text-xs text-muted-foreground">
+              *{scooter.vin.slice(-4)}
+            </p>
             {scooter.deletedAt ? (
               <Badge variant="outline" className="mt-2">
                 {t("recordStatus.deleted")}

@@ -372,6 +372,7 @@ describe("ScootersPage", () => {
     );
     expect(screen.getByText("Licence: AM")).toBeInTheDocument();
     expect(screen.getByLabelText("Mileage: 12,500 km")).toBeInTheDocument();
+    expect(screen.getByText("*3456")).toBeInTheDocument();
     expect(screen.queryByText(scooter.vin)).not.toBeInTheDocument();
     expect(screen.queryByText("2026")).not.toBeInTheDocument();
     expect(screen.queryByText("Local")).not.toBeInTheDocument();

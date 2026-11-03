@@ -290,6 +290,9 @@ export function ScooterDetailHero({
             .filter(Boolean)
             .join(" ")}
         </p>
+        <p className="break-all font-mono text-sm text-muted-foreground">
+          {scooter.vin}
+        </p>
       </div>
     </section>
   );

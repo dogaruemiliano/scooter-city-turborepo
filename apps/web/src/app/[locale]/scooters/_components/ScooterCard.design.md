@@ -10,7 +10,7 @@ Use the card surface and border for the container. Rental state and technical he
 
 ## Typography
 
-The scooter display code is the strongest text. The registration plate always sits beneath the code, followed by brand and model on the next line, at every screen size. Supporting attributes and footer metadata use smaller text. Allow long identities, names, and translated labels to wrap.
+The scooter display code is the strongest text. The registration plate always sits beneath the code, followed by brand and model on the next line, at every screen size. The final four VIN characters appear beneath the brand and model with an asterisk prefix (for example, `*1234`). Supporting attributes and footer metadata use smaller text. Allow long identities, names, and translated labels to wrap.
 
 ## Layout
 
