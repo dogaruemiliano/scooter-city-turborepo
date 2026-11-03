@@ -100,6 +100,13 @@ export const notificationsCatalog = {
     assignmentRemoved: "A job was removed from your assignments.",
     changedFields: "Changed: {fields}",
     pushHeading: "Push notifications",
+    pushPrompt: {
+      title: "Enable push notifications?",
+      description:
+        "Get notified about assigned jobs and important updates, even when ScooterCity is closed.",
+      settingsHint: "You can change this later in notification settings.",
+      notNow: "Not now",
+    },
     pushHelp:
       "Receive a push notification when the app has not shown you the alert. Notifications always remain in your inbox.",
     pushEnabled: "Push notifications enabled",
@@ -308,6 +315,14 @@ export const notificationsCatalog = {
       record: "o înregistrare",
     },
     pushHeading: "Notificări push",
+    pushPrompt: {
+      title: "Activezi notificările push?",
+      description:
+        "Primești notificări despre lucrările atribuite și actualizările importante, chiar și când ScooterCity este închisă.",
+      settingsHint:
+        "Poți modifica această opțiune mai târziu din setările notificărilor.",
+      notNow: "Nu acum",
+    },
     pushHelp:
       "Primești o notificare push când aplicația nu ți-a afișat alerta. Notificările rămân mereu în lista ta.",
     pushEnabled: "Notificările push sunt activate",

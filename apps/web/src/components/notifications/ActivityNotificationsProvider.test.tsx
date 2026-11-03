@@ -35,6 +35,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => mocks.router }));
 vi.mock("./push-client", () => ({
   clearPushForOtherAccount: mocks.clearPush,
   synchronizePushSubscription: mocks.synchronizePush,
+  supportsPush: () => false,
 }));
 
 const item: v1.notifications.Notification = {

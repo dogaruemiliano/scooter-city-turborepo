@@ -20,6 +20,7 @@ import { useOptionalSession } from "@/components/auth/SessionProvider";
 import { useWorkspaceNotifications } from "@/components/WorkspaceNotifications";
 import { localizePath } from "@/i18n/paths";
 import { NotificationChanges } from "./NotificationItem";
+import { PushPermissionPrompt } from "./PushPermissionPrompt";
 import {
   clearPushForOtherAccount,
   synchronizePushSubscription,
@@ -293,6 +294,7 @@ function NotificationSession({
   return (
     <NotificationContext.Provider value={value}>
       {children}
+      <PushPermissionPrompt userId={userId} />
     </NotificationContext.Provider>
   );
 }

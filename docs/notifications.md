@@ -31,6 +31,19 @@ Email and native mobile delivery remain future integrations.
    On iPhone/iPad, use the installed Home Screen web app. Browser permission is
    requested only after the user chooses to enable push.
 
+Eligible signed-in staff see a one-time introduction offering **Enable push
+notifications** or **Not now**. The native browser permission dialog opens only
+from the enable action ([browser permission rules](https://developer.mozilla.org/en-US/docs/Web/API/Notification/requestPermission_static)).
+The introduction is shown only in the foreground when push is configured,
+supported, browser permission is undecided, and the account allows push.
+On iPhone/iPad it waits until the app is installed on the Home Screen.
+The offer and its outcome are stored per user in this browser's local storage
+(`scooter-notifications-prompt:v1:<userId>`), so dismissal, navigation, and login
+do not repeatedly trigger it. Clearing site data or using another browser/device
+allows a new introduction. If storage is blocked, the choice is remembered only
+for the current page session. Notification settings remain available for later
+opt-in; blocked browser permission must be changed in browser/device settings.
+
 All three VAPID settings can remain empty: the inbox and in-app alerts still
 work, and settings accurately report that external push is unconfigured.
 There is no email fallback when push is unavailable or denied.
