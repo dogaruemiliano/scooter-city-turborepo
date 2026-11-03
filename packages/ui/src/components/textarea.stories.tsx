@@ -25,6 +25,24 @@ export const Default: Story = {
   },
 };
 
+export const Inline: Story = {
+  args: {
+    variant: "inline",
+    "aria-label": "Edit item",
+    defaultValue:
+      "Check the brakes and replace worn pads before the next ride.",
+    rows: 1,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "An editable text surface that inherits surrounding typography, wraps with its content, and keeps its transparent, borderless appearance on focus.",
+      },
+    },
+  },
+};
+
 export const WithLabel: Story = {
   render: () => (
     <div className="flex flex-col gap-2">

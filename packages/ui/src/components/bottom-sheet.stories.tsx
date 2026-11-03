@@ -67,6 +67,32 @@ export const LongTitle: Story = {
   ),
 };
 
+/** Dense editors get a wider desktop dialog while mobile remains a bottom sheet. */
+export const WideEditor: Story = {
+  render: () => (
+    <BottomSheet defaultOpen>
+      <BottomSheetContent desktopSize="wide">
+        <BottomSheetHeader>
+          <BottomSheetTitle>Permissions</BottomSheetTitle>
+          <BottomSheetDescription>From Admin</BottomSheetDescription>
+        </BottomSheetHeader>
+        <BottomSheetBody>
+          <div className="grid gap-4 rounded-lg border border-border bg-card p-4 text-card-foreground lg:grid-cols-3">
+            <Label>Scooters · View</Label>
+            <div>All records</div>
+            <Button variant="outline">Use role default</Button>
+          </div>
+        </BottomSheetBody>
+        <BottomSheetFooter>
+          <BottomSheetClose render={<Button variant="secondary" />}>
+            Done
+          </BottomSheetClose>
+        </BottomSheetFooter>
+      </BottomSheetContent>
+    </BottomSheet>
+  ),
+};
+
 export const Default: Story = {
   render: () => (
     <BottomSheet>

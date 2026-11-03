@@ -70,6 +70,8 @@ function Example() {
             placeholder: "e.g. Check the brake pads",
             save: "Save checklist",
             cancel: "Cancel",
+            edit: (text) => `Edit ${text}`,
+            itemRequired: "Enter an item or remove this row.",
             remove: (text) => `Remove ${text}`,
             reorder: (text) => `Move ${text}`,
           }}
@@ -86,4 +88,13 @@ const meta = {
 } satisfies Meta<typeof Example>;
 export default meta;
 type Story = StoryObj<typeof meta>;
-export const Default: Story = {};
+export const Default: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Open the editor and click any item's text to place the caret and edit it in place. Added items stay editable without field chrome. Enter returns to the new-item field; Save commits edits and Cancel discards them. Use the grip or row edges to reorder.",
+      },
+    },
+  },
+};

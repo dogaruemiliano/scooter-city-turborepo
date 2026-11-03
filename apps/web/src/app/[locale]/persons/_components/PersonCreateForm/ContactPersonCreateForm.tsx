@@ -1,5 +1,6 @@
 "use client";
 import { useFormAction } from "@/lib/form/use-form-action";
+import { useFormExitProtection } from "@/components/useFormExitProtection";
 import { SaveButton } from "@repo/ui/components/save-button";
 
 import { useId, useState } from "react";
@@ -45,6 +46,13 @@ export function ContactPersonCreateForm({
     ...createEmptyCreateForm("foreign"),
     documents: [],
   }));
+  const [initialForm] = useState(() => JSON.stringify(form));
+  const exit = useFormExitProtection({
+    dirty: JSON.stringify(form) !== initialForm,
+    pending: task.busy,
+    onLeave: () =>
+      router.replace(personCreateCancelHref(personsHref, rentalDraftId)),
+  });
   const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
   const setValue: SetPersonFormValue = (key, value) =>
     setForm((current) => ({ ...current, [key]: value }));
@@ -57,11 +65,13 @@ export function ContactPersonCreateForm({
       title={t("createPage.title")}
       description={t("createPage.description")}
     >
+      {exit.protection}
       <form
         className="grid gap-6"
         noValidate
         onSubmit={(event) => {
           event.preventDefault();
+          if (task.busy) return;
           void task.run(async () => {
             const candidate = createPersonInput(form, (field, error) =>
               t(`feedback.date.${error}`, { field: t(`fields.${field}`) }),
@@ -111,6 +121,7 @@ export function ContactPersonCreateForm({
               v1.persons.personSchema,
               { method: "POST", json: parsed.data },
             );
+            exit.complete();
             router.push(
               personCreateDestination(
                 personsHref,
@@ -169,18 +180,23 @@ export function ContactPersonCreateForm({
           onChange={(value) => setValue("notes", value)}
         />
         <Feedback error={task.error} />
-        <FormActions ready={ready} pending={task.busy}>
-          <Link
-            href={personCreateCancelHref(personsHref, rentalDraftId)}
-            className={buttonVariants({ variant: "outline" })}
-            aria-disabled={task.busy || undefined}
-            tabIndex={task.busy ? -1 : undefined}
-            onClick={(event) => {
-              if (task.busy) event.preventDefault();
-            }}
-          >
-            {t("actions.cancel")}
-          </Link>
+        <FormActions
+          ready={ready}
+          pending={task.busy}
+          secondaryAction={
+            <Link
+              href={personCreateCancelHref(personsHref, rentalDraftId)}
+              className={buttonVariants({ variant: "outline" })}
+              aria-disabled={task.busy || undefined}
+              tabIndex={task.busy ? -1 : undefined}
+              onClick={(event) => {
+                if (task.busy) event.preventDefault();
+              }}
+            >
+              {t("actions.cancel")}
+            </Link>
+          }
+        >
           <SaveButton
             type="submit"
             disabled={task.busy}

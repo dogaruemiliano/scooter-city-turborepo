@@ -74,6 +74,92 @@ describe("DatePartsField", () => {
   });
 
   it.each([
+    { emptyPart: "YYYY", previousPart: "MM", remaining: "0" },
+    { emptyPart: "MM", previousPart: "DD", remaining: "1" },
+  ])(
+    "Backspace in empty $emptyPart deletes the last digit of $previousPart",
+    async ({ emptyPart, previousPart, remaining }) => {
+      const browser = userEvent.setup();
+      const onBlur = vi.fn();
+      renderField("en", { defaultValue: "2026-08-12", onBlur });
+      const current = screen.getByPlaceholderText(emptyPart);
+      const previous = screen.getByPlaceholderText(
+        previousPart,
+      ) as HTMLInputElement;
+
+      await browser.clear(current);
+      onBlur.mockClear();
+      await browser.keyboard("{Backspace}");
+
+      expect(current).toHaveValue("");
+      expect(previous).toHaveValue(remaining);
+      expect(previous).toHaveFocus();
+      expect(previous.selectionStart).toBe(remaining.length);
+      expect(previous.selectionEnd).toBe(remaining.length);
+      expect(onBlur).not.toHaveBeenCalled();
+    },
+  );
+
+  it("keeps deleting backward through the whole date and stops at the empty day", async () => {
+    const browser = userEvent.setup();
+    const { container } = renderField("en", {
+      defaultValue: "2026-08-12",
+      name: "date",
+    });
+    const day = screen.getByPlaceholderText("DD");
+    const month = screen.getByPlaceholderText("MM");
+    const year = screen.getByPlaceholderText("YYYY");
+
+    await browser.click(year);
+    await browser.keyboard("{End}{Backspace>4/}");
+    expect(year).toHaveValue("");
+    expect(year).toHaveFocus();
+    expect(
+      container.querySelector('input[type="hidden"][name="date"]'),
+    ).toHaveValue("");
+
+    await browser.keyboard("{Backspace>2/}");
+    expect(month).toHaveValue("");
+    expect(month).toHaveFocus();
+    expect(day).toHaveValue("12");
+
+    await browser.keyboard("{Backspace>3/}");
+    expect(day).toHaveValue("");
+    expect(day).toHaveFocus();
+  });
+
+  it("moves back only one segment when the previous segment is also empty", async () => {
+    const browser = userEvent.setup();
+    renderField("en");
+    const year = screen.getByPlaceholderText("YYYY");
+    const month = screen.getByPlaceholderText("MM");
+
+    await browser.click(year);
+    await browser.keyboard("{Backspace}");
+    expect(month).toHaveValue("");
+    expect(month).toHaveFocus();
+
+    await browser.keyboard("{Backspace}");
+    expect(screen.getByPlaceholderText("DD")).toHaveFocus();
+  });
+
+  it("preserves native deletion within a nonempty segment", async () => {
+    const browser = userEvent.setup();
+    renderField("en", { defaultValue: "2026-08-12" });
+    const month = screen.getByPlaceholderText("MM");
+
+    await browser.click(month);
+    await browser.keyboard("{Home}{Backspace}");
+    expect(month).toHaveValue("08");
+    expect(month).toHaveFocus();
+    expect(screen.getByPlaceholderText("DD")).toHaveValue("12");
+
+    await browser.keyboard("{ArrowRight}{Backspace}");
+    expect(month).toHaveValue("8");
+    expect(month).toHaveFocus();
+  });
+
+  it.each([
     { locale: "en" as const, triggerName: "Open calendar" },
     { locale: "ro" as const, triggerName: "Deschide calendarul" },
   ])("labels the calendar trigger in $locale", ({ locale, triggerName }) => {

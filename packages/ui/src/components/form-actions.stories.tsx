@@ -40,7 +40,7 @@ export const WithStatus: Story = {
   ),
 };
 
-/** Status gets its own row; mobile puts the primary action above secondary actions. */
+/** Floating page actions keep only the primary action on mobile. */
 export const SplitWithStatus: Story = {
   args: {
     arrangement: "split",
@@ -48,16 +48,20 @@ export const SplitWithStatus: Story = {
     status: "Funding details are ready for review.",
   },
   render: (args) => (
-    <FormActions {...args}>
+    <FormActions
+      {...args}
+      secondaryAction={
+        <Button type="button" variant="outline">
+          Cancel
+        </Button>
+      }
+    >
       <SaveButton
         type="button"
         idleLabel="Record funding"
         pendingLabel="Recording funding…"
         successLabel="Funding recorded"
       />
-      <Button type="button" variant="outline">
-        Cancel
-      </Button>
     </FormActions>
   ),
 };
@@ -94,10 +98,15 @@ export const StickyCard: Story = {
           respecting the device safe area.
         </p>
       </div>
-      <FormActions sticky status="Review the required details before saving.">
-        <Button type="button" variant="outline">
-          Cancel
-        </Button>
+      <FormActions
+        sticky
+        status="Review the required details before saving."
+        secondaryAction={
+          <Button type="button" variant="outline">
+            Cancel
+          </Button>
+        }
+      >
         <Button type="button">Save details and finish</Button>
       </FormActions>
     </form>
@@ -137,10 +146,18 @@ export const StickyInPageScroll: Story = {
                   the final fields remain reachable.
                 </CardContent>
               </Card>
-              <FormActions {...args}>
-                <Button type="button" variant="outline" disabled={args.pending}>
-                  Cancel
-                </Button>
+              <FormActions
+                {...args}
+                secondaryAction={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={args.pending}
+                  >
+                    Cancel
+                  </Button>
+                }
+              >
                 <SaveButton
                   type="button"
                   state={args.pending ? "pending" : "idle"}
@@ -165,10 +182,14 @@ export const RevealWhenReady: Story = {
   render: (args) => (
     <form className="flex min-h-dvh flex-col gap-6 p-4">
       <p className="flex-1 text-sm text-muted-foreground">Form content</p>
-      <FormActions {...args}>
-        <Button type="button" variant="outline" disabled={args.pending}>
-          Cancel
-        </Button>
+      <FormActions
+        {...args}
+        secondaryAction={
+          <Button type="button" variant="outline" disabled={args.pending}>
+            Cancel
+          </Button>
+        }
+      >
         <Button type="button" disabled={!args.ready || args.pending}>
           {args.pending ? "Saving…" : "Save"}
         </Button>
@@ -180,16 +201,70 @@ export const RevealWhenReady: Story = {
 /** Compact action bars retain touch targets while reducing padding and gaps. */
 export const CompactSaveBar: Story = {
   render: () => (
-    <FormActions arrangement="split" density="compact" ready>
+    <FormActions
+      density="compact"
+      ready
+      secondaryAction={
+        <Button type="button" variant="text">
+          Cancel
+        </Button>
+      }
+    >
       <SaveButton
         type="button"
         idleLabel="Save changes"
         pendingLabel="Saving…"
         successLabel="Changes saved"
       />
-      <Button type="button" variant="text">
-        Cancel
-      </Button>
+    </FormActions>
+  ),
+};
+
+/** Use the mobile header to leave; desktop retains Cancel beside the primary action. */
+export const MobilePrimaryAction: Story = {
+  parameters: { layout: "fullscreen" },
+  globals: { viewport: { value: "mobile1", isRotated: false } },
+  args: { ready: true },
+  render: (args) => (
+    <FormActions
+      {...args}
+      status="Changes are ready to save."
+      secondaryAction={
+        <Button type="button" variant="outline">
+          Cancel
+        </Button>
+      }
+    >
+      <SaveButton
+        type="button"
+        state={args.pending ? "pending" : "idle"}
+        idleLabel="Create"
+        pendingLabel="Creating…"
+        successLabel="Created"
+      />
+    </FormActions>
+  ),
+};
+
+export const LongPrimaryLabel: Story = {
+  parameters: { layout: "fullscreen" },
+  args: { ready: true },
+  render: (args) => (
+    <FormActions
+      {...args}
+      secondaryAction={
+        <Button type="button" variant="outline">
+          Anulează
+        </Button>
+      }
+    >
+      <SaveButton
+        type="button"
+        state={args.pending ? "pending" : "idle"}
+        idleLabel="Salvează modificările responsabililor și continuă la confirmare"
+        pendingLabel="Se salvează modificările responsabililor…"
+        successLabel="Modificările au fost salvate"
+      />
     </FormActions>
   ),
 };

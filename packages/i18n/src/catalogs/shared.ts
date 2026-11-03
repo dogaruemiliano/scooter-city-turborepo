@@ -1,5 +1,18 @@
 export const sharedCatalog = {
   en: {
+    pullToRefresh: {
+      pull: "Pull to refresh",
+      release: "Release to refresh",
+      refreshing: "Refreshing…",
+      refresh: "Refresh page data",
+    },
+    formExit: {
+      title: "Discard unsaved changes?",
+      description:
+        "Your changes have not been saved. Leaving this form will discard them.",
+      keepEditing: "Keep editing",
+      discard: "Discard changes",
+    },
     attachments: {
       title: "Add photos or files",
       close: "Close",
@@ -163,6 +176,19 @@ export const sharedCatalog = {
     },
   },
   ro: {
+    pullToRefresh: {
+      pull: "Trage în jos pentru a actualiza",
+      release: "Eliberează pentru a actualiza",
+      refreshing: "Se actualizează…",
+      refresh: "Actualizează datele paginii",
+    },
+    formExit: {
+      title: "Renunți la modificările nesalvate?",
+      description:
+        "Modificările nu au fost salvate. Dacă părăsești formularul, acestea se vor pierde.",
+      keepEditing: "Continuă editarea",
+      discard: "Renunță la modificări",
+    },
     attachments: {
       title: "Adaugă fotografii sau fișiere",
       close: "Închide",

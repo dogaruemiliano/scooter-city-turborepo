@@ -124,6 +124,14 @@ export function RentalCreateWizard({
   const [attempted, setAttempted] = useState(false);
   const leaveGuard = useWizardLeaveGuard(
     Boolean(draft && canPersistRentalDraft(draft) && !draft.createdRentalId),
+    {
+      blocked: task.busy || Boolean(draft?.submissionUncertain),
+      onBrowserBack: () => {
+        if (draft?.step !== "review") return false;
+        edit();
+        return true;
+      },
+    },
   );
   const submitting = useRef(false);
   const mounted = useRef(true);
@@ -371,11 +379,15 @@ export function RentalCreateWizard({
       <PageHeaderNavigation
         onBack={() => {
           if (task.busy || submitting.current) return;
+          if (draft.step === "review") {
+            edit();
+            return;
+          }
           if (canPersistRentalDraft(draft))
             leaveGuard.requestLeave(() => router.replace("/rentals"));
           else if (store.discard()) router.replace("/rentals");
         }}
-        backDisabled={task.busy}
+        backDisabled={task.busy || draft.submissionUncertain}
       />
       <WizardForm
         noValidate
@@ -748,18 +760,19 @@ export function RentalCreateWizard({
                   ? t("saved")
                   : undefined
             }
+            secondaryAction={
+              draft.step === "review" ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={task.busy}
+                  onClick={edit}
+                >
+                  {t("back")}
+                </Button>
+              ) : null
+            }
           >
-            {draft.step === "review" ? (
-              <Button
-                type="button"
-                variant="outline"
-                className="hidden md:inline-flex"
-                disabled={task.busy}
-                onClick={edit}
-              >
-                {t("back")}
-              </Button>
-            ) : null}
             <SaveButton
               type="submit"
               disabled={

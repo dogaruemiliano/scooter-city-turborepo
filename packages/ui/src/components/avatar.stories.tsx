@@ -101,6 +101,45 @@ export const UserInitials: Story = {
   render: () => <UserAvatar name="Ada Lovelace" size="xl" />,
 };
 
+/** Single and grouped assignees use the same UserAvatar defaults. */
+export const UserGroups: Story = {
+  render: () => (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center gap-2">
+        <UserAvatar aria-hidden="true" name="Ada Lovelace" />
+        <span className="text-sm">Ada Lovelace</span>
+      </div>
+      <AvatarGroup role="img" aria-label="Ada Lovelace, Alex Morgan">
+        <UserAvatar
+          aria-hidden="true"
+          name="Ada Lovelace"
+          src={avatarFixture}
+        />
+        <UserAvatar aria-hidden="true" name="Alex Morgan" />
+      </AvatarGroup>
+      <AvatarGroup
+        role="img"
+        aria-label="Ada Lovelace, Alex Morgan, Mara Popescu"
+      >
+        <UserAvatar aria-hidden="true" name="Ada Lovelace" />
+        <UserAvatar aria-hidden="true" name="Alex Morgan" />
+        <UserAvatar aria-hidden="true" name="Mara Popescu" />
+      </AvatarGroup>
+      <div className="max-w-32">
+        <AvatarGroup role="img" aria-label="Ten assignees in a narrow card">
+          {Array.from({ length: 10 }, (_, index) => (
+            <UserAvatar
+              key={index}
+              aria-hidden="true"
+              name={`User ${index + 1}`}
+            />
+          ))}
+        </AvatarGroup>
+      </div>
+    </div>
+  ),
+};
+
 /** Non-square uploads fill the fixed avatar bounds with a centered crop. */
 export const NonSquarePictures: Story = {
   render: () => (

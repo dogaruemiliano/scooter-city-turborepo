@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useImperativeHandle, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import { Tabs as TabsPrimitive } from "@base-ui/react/tabs";
 import { cva, type VariantProps } from "class-variance-authority";
+import { scrollFade } from "@repo/theme";
 
 import { cn } from "@repo/ui/lib/utils";
 
@@ -46,67 +47,25 @@ function TabsList({
   style,
   ...props
 }: TabsPrimitive.List.Props & VariantProps<typeof tabsListVariants>) {
-  const listRef = useRef<HTMLDivElement>(null);
-  const [edges, setEdges] = useState({ left: false, right: false });
-  useImperativeHandle(ref, () => listRef.current!);
-
-  useEffect(() => {
-    const list = listRef.current;
-    if (!list) return;
-    const update = () => {
-      const horizontal =
-        list.closest('[data-slot="tabs"]')?.getAttribute("data-orientation") !==
-        "vertical";
-      // RTL browsers use negative scrollLeft; convert it to physical edges.
-      const rtl = getComputedStyle(list).direction === "rtl";
-      const remaining = Math.max(0, list.scrollWidth - list.clientWidth);
-      const left = rtl ? remaining + list.scrollLeft : list.scrollLeft;
-      const next = {
-        left: horizontal && left > 1,
-        right: horizontal && remaining - left > 1,
-      };
-      setEdges((current) =>
-        current.left === next.left && current.right === next.right
-          ? current
-          : next,
-      );
-    };
-    update();
-    list.addEventListener("scroll", update, { passive: true });
-    const resize = new ResizeObserver(update);
-    resize.observe(list);
-    const observeChildren = () => {
-      resize.disconnect();
-      resize.observe(list);
-      for (const child of list.children) resize.observe(child);
-      update();
-    };
-    observeChildren();
-    const mutation = new MutationObserver(observeChildren);
-    mutation.observe(list, {
-      childList: true,
-      subtree: true,
-      characterData: true,
-    });
-    return () => {
-      list.removeEventListener("scroll", update);
-      resize.disconnect();
-      mutation.disconnect();
-    };
-  }, []);
-
-  const edgeMask =
-    edges.left || edges.right
-      ? `linear-gradient(to right, ${edges.left ? "transparent" : "currentColor"}, currentColor var(--spacing-6), currentColor calc(100% - var(--spacing-6)), ${edges.right ? "transparent" : "currentColor"})`
-      : undefined;
-
   return (
     <TabsPrimitive.List
-      ref={listRef}
-      style={{ maskImage: edgeMask, WebkitMaskImage: edgeMask, ...style }}
+      ref={ref}
+      style={
+        {
+          "--scroll-fade-width": "var(--spacing-4)",
+          "--scroll-fade-start": "transparent",
+          "--scroll-fade-end": "transparent",
+          "--scroll-fade-mask": scrollFade.softMask,
+          ...style,
+        } as CSSProperties & Record<`--${string}`, string>
+      }
       data-slot="tabs-list"
       data-variant={variant}
-      className={cn(tabsListVariants({ variant }), className)}
+      className={cn(
+        tabsListVariants({ variant }),
+        "group-data-horizontal/tabs:px-(--scroll-fade-width) group-data-horizontal/tabs:scroll-px-(--scroll-fade-width) group-data-horizontal/tabs:mask-(--scroll-fade-mask)",
+        className,
+      )}
       {...props}
     />
   );

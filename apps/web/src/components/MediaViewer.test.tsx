@@ -8,6 +8,7 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
 import { MediaViewer, type MediaItem } from "@repo/ui/components/media-viewer";
 import {
   MediaCollection,
@@ -157,6 +158,30 @@ afterEach(() => {
 });
 
 describe("unified media viewer", () => {
+  it.each([items[0]!, items[1]!])(
+    "closes $fileName on backdrop clicks while keeping preview interactions open",
+    async (item) => {
+      const user = userEvent.setup();
+      render(
+        <MediaCollection {...labels} items={[item]}>
+          <Open id={item.id} name="Open preview" />
+        </MediaCollection>,
+      );
+      const trigger = screen.getByRole("button", { name: "Open preview" });
+      await user.click(trigger);
+      const dialog = screen.getByRole("dialog");
+      await user.click(viewport());
+      await user.click(button("Zoom in"));
+      expect(dialog).toBeInTheDocument();
+
+      await user.click(
+        document.querySelector<HTMLElement>('[data-slot="dialog-overlay"]')!,
+      );
+      await waitFor(() => expect(dialog).not.toBeInTheDocument());
+      await waitFor(() => expect(trigger).toHaveFocus());
+    },
+  );
+
   it("uses one navigation sequence for images, PDF pages, and PDF boundaries in both directions", async () => {
     render(<Viewer />);
     expect(button("Previous")).toBeDisabled();
@@ -347,6 +372,10 @@ describe("unified media viewer", () => {
     expect(button("Confirm changes")).toBeDisabled();
     fireEvent.click(button("Confirm changes"));
     expect(replace).toHaveBeenCalledTimes(1);
+    await userEvent.click(
+      document.querySelector<HTMLElement>('[data-slot="dialog-overlay"]')!,
+    );
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
     await act(async () => reject(new Error("Upload failed")));
     expect(screen.getByRole("alert")).toHaveTextContent("Upload failed");
     expect(button("Confirm changes")).toBeEnabled();

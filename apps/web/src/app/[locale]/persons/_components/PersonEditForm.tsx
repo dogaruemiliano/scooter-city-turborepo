@@ -10,17 +10,7 @@ import { useFormAction } from "@/lib/form/use-form-action";
 import { SaveButton } from "@repo/ui/components/save-button";
 
 import { ApiError, v1 } from "@repo/api-shared";
-import {
-  Button,
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  FormSection,
-} from "@repo/ui/components";
+import { FormSection } from "@repo/ui/components";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
@@ -35,7 +25,7 @@ import {
 } from "@/components/form/controls";
 import { FormField } from "@/components/form/FormField";
 import { FormSummary } from "@/components/form/FormSummary";
-import { PageHeaderNavigation } from "@/components/PageHeaderNavigation";
+import { useFormExitProtection } from "@/components/useFormExitProtection";
 import { PageTitleOverride } from "@/components/PageTitleOverride";
 import { useZodForm } from "@/lib/form/use-zod-form";
 import { webApi } from "@/lib/api";
@@ -58,7 +48,6 @@ export function PersonEditForm({ person, personHref }: PersonEditFormProps) {
   const locale = useLocale();
   const router = useRouter();
   const [saving, setSaving] = useState(false);
-  const [leaveOpen, setLeaveOpen] = useState(false);
   const [picture, setPicture] = useState<ProfilePictureChange>(undefined);
   const busy = saving;
   const tAvatar = useTranslations("auth.avatar");
@@ -74,6 +63,7 @@ export function PersonEditForm({ person, personHref }: PersonEditFormProps) {
   );
 
   const dirty = form.formState.isDirty || picture !== undefined;
+  const exit = useFormExitProtection({ dirty, pending: busy });
 
   async function submit(input: v1.persons.UpdatePersonInput) {
     if (busy || !dirty) return;
@@ -104,6 +94,7 @@ export function PersonEditForm({ person, personHref }: PersonEditFormProps) {
         setPicture(undefined);
         window.dispatchEvent(new Event("access-changed"));
       }
+      exit.complete();
       router.push(personHref);
       router.refresh();
     } catch (caught) {
@@ -121,40 +112,7 @@ export function PersonEditForm({ person, personHref }: PersonEditFormProps) {
   return (
     <PageLayout className="pb-16 sm:pb-24">
       <PageTitleOverride title={t("editPage.title")} />
-      <PageHeaderNavigation
-        backDisabled={busy}
-        onBack={() => {
-          if (busy) return;
-          if (dirty) setLeaveOpen(true);
-          else router.back();
-        }}
-      />
-      <Dialog open={leaveOpen} onOpenChange={setLeaveOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("leaveForm.title")}</DialogTitle>
-            <DialogDescription>
-              {t("leaveForm.editDescription")}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <DialogClose render={<Button type="button" variant="outline" />}>
-              {t("leaveForm.keepEditing")}
-            </DialogClose>
-            <SaveButton
-              type="button"
-              variant="destructive"
-              idleLabel={t("leaveForm.discard")}
-              pendingLabel={t("leaveForm.discard")}
-              successLabel={t("leaveForm.discard")}
-              onClick={() => {
-                setLeaveOpen(false);
-                router.back();
-              }}
-            />
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {exit.protection}
       <FormProvider {...form}>
         <form
           className="flex flex-1 flex-col gap-8"
@@ -260,12 +218,7 @@ export function PersonEditForm({ person, personHref }: PersonEditFormProps) {
           </fieldset>
 
           {dirty || busy ? (
-            <FormActions
-              arrangement="split"
-              density="compact"
-              ready
-              pending={busy}
-            >
+            <FormActions density="compact" ready pending={busy}>
               <SaveButton
                 type="submit"
                 disabled={busy}

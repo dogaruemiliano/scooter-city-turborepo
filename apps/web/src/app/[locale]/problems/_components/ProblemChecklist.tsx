@@ -136,6 +136,8 @@ export function ProblemChecklist({
             ),
             save: t(kind === "buyList" ? "saveBuyList" : "saveChecklist"),
             cancel: shared("cancel"),
+            edit: (text) => t("editChecklistItem", { text }),
+            itemRequired: t("checklistItemRequired"),
             remove: (text) =>
               t(
                 kind === "buyList"

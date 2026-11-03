@@ -5,6 +5,14 @@ export const scooterReextractionMessages = {
     description:
       "Choose which suggestions to apply. Existing values are kept by default. Nothing is saved until you save the scooter form.",
     progress: "Analyzing documents: {done} of {total} completed…",
+    pendingAction: "Analyzing {done} of {total}…",
+    eligibleDocuments:
+      "Re-extract data from CIVs, insurance policies and ITP certificates. Other attachments and client copies are kept without re-extraction.",
+    preparing: "Preparing…",
+    queued: "Queued…",
+    analyzing: "Analyzing…",
+    completed: "Completed",
+    failed: "Could not analyze",
     found:
       "Found {additions, plural, one {# addition} other {# additions}} and {differences, plural, one {# difference} other {# differences}}. Review the originals before applying.",
     current: "Current value",
@@ -44,6 +52,14 @@ export const scooterReextractionMessages = {
     description:
       "Alege propunerile pe care le aplici. Valorile existente sunt păstrate implicit. Datele se salvează doar când salvezi formularul scuterului.",
     progress: "Se analizează documentele: {done} din {total} finalizate…",
+    pendingAction: "Se analizează {done} din {total}…",
+    eligibleDocuments:
+      "Se reextrag datele din CIV, polițe de asigurare și certificate ITP. Celelalte documente și copiile pentru client se păstrează fără reextragere.",
+    preparing: "Se pregătește…",
+    queued: "În așteptare…",
+    analyzing: "Se analizează…",
+    completed: "Finalizat",
+    failed: "Nu s-a putut analiza",
     found:
       "Am găsit {additions, plural, one {o completare} few {# completări} other {# de completări}} și {differences, plural, one {o diferență} few {# diferențe} other {# de diferențe}}. Verifică documentele originale înainte de aplicare.",
     current: "Valoare actuală",

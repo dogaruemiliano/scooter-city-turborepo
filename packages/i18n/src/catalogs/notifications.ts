@@ -40,6 +40,23 @@ export const notificationsCatalog = {
     all: "All notifications",
     unread: "Unread",
     unreadBadge: "Unread",
+    allFilter: "All",
+    filterLabel: "Show notifications",
+    inboxHelp: "Your fleet, jobs, and team updates in one place.",
+    activityHelp:
+      "A chronological record of team activity, including your own actions.",
+    today: "Today",
+    yesterday: "Yesterday",
+    earlier: "Earlier",
+    justNow: "Just now",
+    newNotifications:
+      "{count, plural, one {# new notification} other {# new notifications}}",
+    showNew: "Show new notifications",
+    caughtUpHelp: "New updates will appear here. You're up to date for now.",
+    emptyFiltered: "No notifications match these filters.",
+    emptyUnread: "No unread notifications.",
+    resetFilters: "Show all notifications",
+    closePreview: "Close notifications",
     allCategories: "All categories",
     category: "Category",
     empty: "You're all caught up.",
@@ -50,6 +67,10 @@ export const notificationsCatalog = {
     refresh: "Refresh",
     error: "Notifications could not be loaded. Please try again.",
     mutationError: "The notification could not be updated. Please try again.",
+    seenError:
+      "Notifications could not be marked as seen. Your unread count has been kept.",
+    retrySeen: "Mark notifications as seen",
+    loadMoreError: "Older notifications could not be loaded. Please try again.",
     markRead: "Mark as read",
     markAllRead: "Mark all as read",
     markingRead: "Marking as read…",
@@ -79,6 +100,13 @@ export const notificationsCatalog = {
     assignmentRemoved: "A job was removed from your assignments.",
     changedFields: "Changed: {fields}",
     pushHeading: "Push notifications",
+    pushPrompt: {
+      title: "Enable push notifications?",
+      description:
+        "Get notified about assigned jobs and important updates, even when ScooterCity is closed.",
+      settingsHint: "You can change this later in notification settings.",
+      notNow: "Not now",
+    },
     pushHelp:
       "Receive a push notification when the app has not shown you the alert. Notifications always remain in your inbox.",
     pushEnabled: "Push notifications enabled",
@@ -226,6 +254,23 @@ export const notificationsCatalog = {
     all: "Toate notificările",
     unread: "Necitite",
     unreadBadge: "Necitită",
+    allFilter: "Toate",
+    filterLabel: "Afișează notificările",
+    inboxHelp: "Noutăți despre flotă, lucrări și echipă, într-un singur loc.",
+    activityHelp: "Istoricul activității echipei, inclusiv acțiunile tale.",
+    today: "Astăzi",
+    yesterday: "Ieri",
+    earlier: "Mai devreme",
+    justNow: "Chiar acum",
+    newNotifications:
+      "{count, plural, one {# notificare nouă} few {# notificări noi} other {# de notificări noi}}",
+    showNew: "Afișează notificările noi",
+    caughtUpHelp:
+      "Actualizările noi vor apărea aici. Ești la zi pentru moment.",
+    emptyFiltered: "Nicio notificare nu corespunde filtrelor.",
+    emptyUnread: "Nu ai notificări necitite.",
+    resetFilters: "Afișează toate notificările",
+    closePreview: "Închide notificările",
     allCategories: "Toate categoriile",
     category: "Categorie",
     empty: "Ești la zi cu toate notificările.",
@@ -236,6 +281,11 @@ export const notificationsCatalog = {
     refresh: "Reîncarcă",
     error: "Notificările nu au putut fi încărcate. Încearcă din nou.",
     mutationError: "Notificarea nu a putut fi actualizată. Încearcă din nou.",
+    seenError:
+      "Notificările nu au putut fi marcate ca văzute. Numărul celor necitite a fost păstrat.",
+    retrySeen: "Marchează notificările ca văzute",
+    loadMoreError:
+      "Notificările mai vechi nu au putut fi încărcate. Încearcă din nou.",
     markRead: "Marchează ca citită",
     markAllRead: "Marchează toate ca citite",
     markingRead: "Se marchează ca citite…",
@@ -265,6 +315,14 @@ export const notificationsCatalog = {
       record: "o înregistrare",
     },
     pushHeading: "Notificări push",
+    pushPrompt: {
+      title: "Activezi notificările push?",
+      description:
+        "Primești notificări despre lucrările atribuite și actualizările importante, chiar și când ScooterCity este închisă.",
+      settingsHint:
+        "Poți modifica această opțiune mai târziu din setările notificărilor.",
+      notNow: "Nu acum",
+    },
     pushHelp:
       "Primești o notificare push când aplicația nu ți-a afișat alerta. Notificările rămân mereu în lista ta.",
     pushEnabled: "Notificările push sunt activate",

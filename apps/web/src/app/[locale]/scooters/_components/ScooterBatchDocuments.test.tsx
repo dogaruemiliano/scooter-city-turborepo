@@ -693,6 +693,53 @@ it("retains an expired insurance with its badge and a missing valid insurance sl
   );
   expect(screen.getByText("Expired")).toBeInTheDocument();
   expect(
+    screen.getByText(messages.en.scooters.documents.renewDocument),
+  ).toBeInTheDocument();
+  expect(
     fixture.container.querySelectorAll('[data-slot="scooter-document-ghost"]'),
   ).toHaveLength(6);
+});
+
+it("fills attached ITP slots even when validity is unknown, including logical documents in mixed PDFs", () => {
+  const fixture = render(
+    view({
+      attached: [
+        {
+          ...existing,
+          id: "inspection",
+          type: "itp_certificate",
+          fileName: "certificate-and-card.pdf",
+          extractedData: {
+            vin: null,
+            fields: {},
+            rawFields: {},
+            documents: ["itp_certificate", "itp_card"].map(
+              (documentType, index) => ({
+                id: `document-${index}`,
+                documentType: documentType as "itp_card" | "itp_certificate",
+                pages: [1],
+                vin: null,
+                fields: {},
+                rawFields: {},
+                issues: [],
+              }),
+            ),
+          },
+        },
+      ],
+      editing: true,
+      itpValidUntil: "2020-01-01",
+    }),
+  );
+  const ghosts = [
+    ...fixture.container.querySelectorAll(
+      '[data-slot="scooter-document-ghost"]',
+    ),
+  ];
+  const itpGhosts = ghosts.filter((ghost) =>
+    ghost.textContent?.includes("ITP"),
+  );
+  expect(itpGhosts).toHaveLength(2);
+  for (const ghost of itpGhosts) expect(ghost).toHaveTextContent("For client");
+  expect(screen.getAllByText("Check validity")).toHaveLength(2);
 });

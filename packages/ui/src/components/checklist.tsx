@@ -22,6 +22,7 @@ import { Checkbox } from "./checkbox";
 import { Input } from "./input";
 import { Label } from "./label";
 import { SortableGrid } from "./sortable-grid";
+import { Textarea } from "./textarea";
 
 export type ChecklistItem = { id: string; text: string; completed: boolean };
 
@@ -131,6 +132,8 @@ export type ChecklistEditorLabels = {
   placeholder: string;
   save: string;
   cancel: string;
+  edit: (text: string) => string;
+  itemRequired: string;
   remove: (text: string) => string;
   reorder: (text: string) => string;
 };
@@ -163,6 +166,7 @@ export function ChecklistEditor({
   const input = useRef<HTMLInputElement>(null);
   const blocked = busy || saving;
   const interacting = blocked || sorting;
+  const invalid = items.some((item) => !item.text.trim());
   function addItem() {
     if (interacting || !text.trim() || items.length >= 50) return;
     setItems((current) => [
@@ -221,9 +225,47 @@ export function ChecklistEditor({
               }}
               renderItem={(item) => (
                 <div className="flex min-h-12 items-center gap-3 px-4 py-2">
-                  <span className="min-w-0 flex-1 whitespace-pre-wrap wrap-anywhere">
-                    {item.text}
-                  </span>
+                  <div className="min-w-0 flex-1">
+                    <Textarea
+                      variant="inline"
+                      aria-label={labels.edit(item.text)}
+                      aria-invalid={!item.text.trim() || undefined}
+                      aria-describedby={
+                        !item.text.trim() ? `${id}-${item.id}-error` : undefined
+                      }
+                      rows={1}
+                      maxLength={300}
+                      required
+                      readOnly={interacting}
+                      value={item.text}
+                      onChange={(event) => {
+                        const text = event.target.value;
+                        setItems((current) =>
+                          current.map((entry) =>
+                            entry.id === item.id ? { ...entry, text } : entry,
+                          ),
+                        );
+                      }}
+                      onKeyDown={(event) => {
+                        if (
+                          event.key !== "Enter" ||
+                          event.nativeEvent.isComposing
+                        )
+                          return;
+                        event.preventDefault();
+                        event.stopPropagation();
+                        input.current?.focus();
+                      }}
+                    />
+                    {!item.text.trim() ? (
+                      <p
+                        id={`${id}-${item.id}-error`}
+                        className="text-xs text-destructive"
+                      >
+                        {labels.itemRequired}
+                      </p>
+                    ) : null}
+                  </div>
                   <GripVertical
                     aria-hidden="true"
                     className="size-4 shrink-0 text-muted-foreground"
@@ -289,20 +331,24 @@ export function ChecklistEditor({
         <BottomSheetFooter>
           <Button
             type="button"
-            disabled={interacting}
+            disabled={interacting || invalid}
             onClick={async () => {
-              if (interacting) return;
+              if (interacting || invalid) return;
+              const edited = items.map((item) => ({
+                ...item,
+                text: item.text.trim(),
+              }));
               const next =
                 text.trim() && items.length < 50
                   ? [
-                      ...items,
+                      ...edited,
                       {
                         id: crypto.randomUUID(),
                         text: text.trim(),
                         completed: false,
                       },
                     ]
-                  : items;
+                  : edited;
               setSaving(true);
               try {
                 if (await onSave(next)) onClose();

@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -8,17 +9,26 @@ import {
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { messages } from "@repo/i18n";
-import { it, expect, vi } from "vitest";
+import { it, expect, vi, beforeEach } from "vitest";
+import {
+  PageHeaderNavigationContext,
+  type PageHeaderNavigationOptions,
+} from "@/components/PageHeaderNavigation";
 import { PersonCreateForm } from "./PersonCreateForm";
 
 const mocks = vi.hoisted(() => ({
   fetch: vi.fn(),
   push: vi.fn(),
   refresh: vi.fn(),
+  replace: vi.fn(),
+  register: vi.fn((options: PageHeaderNavigationOptions) => {
+    void options;
+    return () => {};
+  }),
 }));
 vi.mock("@/lib/api", () => ({ webApi: { fetch: mocks.fetch } }));
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: mocks.push, refresh: mocks.refresh }),
+  useRouter: () => mocks,
 }));
 vi.mock("@/components/auth/SessionProvider", () => ({
   useOptionalSession: () => ({
@@ -82,3 +92,50 @@ it.each([undefined, "rental-draft"])(
     );
   },
 );
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  window.history.replaceState({}, "", "/en/persons/new");
+});
+function mount() {
+  render(
+    <NextIntlClientProvider locale="en" messages={messages.en}>
+      <PageHeaderNavigationContext value={mocks.register}>
+        <PersonCreateForm personsHref="/en/persons" />
+      </PageHeaderNavigationContext>
+    </NextIntlClientProvider>,
+  );
+}
+function back() {
+  mocks.register.mock.calls.at(-1)![0].onBack!();
+}
+
+it("leaves an empty contact form immediately and places Cancel in the desktop-only slot", () => {
+  mount();
+  expect(
+    screen.getByRole("link", { name: "Cancel" }).parentElement,
+  ).toHaveClass("hidden", "md:flex");
+  act(back);
+  expect(mocks.replace).toHaveBeenCalledWith("/en/persons");
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(mocks.fetch).not.toHaveBeenCalled();
+});
+
+it("protects typed contact details on header and browser Back without writing them", async () => {
+  const user = userEvent.setup();
+  mount();
+  await user.type(screen.getByLabelText("First name"), "Ada");
+  act(back);
+  expect(
+    screen.getByRole("dialog", { name: "Discard unsaved changes?" }),
+  ).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Keep editing" }));
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+  );
+  expect(screen.getByLabelText("First name")).toHaveValue("Ada");
+  fireEvent.popState(window, { state: {} });
+  expect(screen.getByRole("dialog")).toBeVisible();
+  expect(mocks.replace).not.toHaveBeenCalled();
+  expect(mocks.fetch).not.toHaveBeenCalled();
+});

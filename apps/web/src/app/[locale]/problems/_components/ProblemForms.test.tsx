@@ -15,6 +15,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CreateProblem, ProblemWork, memberName } from "./ProblemForms";
 import { ProblemEditScreen } from "./ProblemEditScreen";
 import { ProblemCreateScreen } from "./ProblemCreateScreen";
+import { ProblemDetailScreen } from "./ProblemDetailScreen";
+import { PageRefreshSurface } from "@/components/PageRefresh";
 import { AssigneeSelect } from "./AssigneeSelect";
 import { ProblemAssignment } from "./ProblemAssignment";
 
@@ -113,6 +115,65 @@ beforeEach(() => {
 });
 
 describe("problem release forms", () => {
+  it.each([false, true])(
+    "refreshes mobile details and comments while retaining a comment draft (todo=%s)",
+    async (todo) => {
+      const previousMatchMedia = window.matchMedia;
+      window.matchMedia = vi.fn().mockReturnValue({
+        matches: true,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      } as unknown as MediaQueryList);
+      const baseFetch = mocks.fetch.getMockImplementation()!;
+      const record = {
+        ...problem,
+        scooterId: todo ? null : problem.scooterId,
+        scooter: todo ? null : problem.scooter,
+      };
+      mocks.fetch.mockImplementation((path: string) =>
+        path === "/v1/problems/report"
+          ? Promise.resolve(record)
+          : baseFetch(path),
+      );
+      try {
+        renderForm(
+          <div>
+            <PageRefreshSurface>
+              <ProblemDetailScreen id="report" />
+            </PageRefreshSurface>
+          </div>,
+        );
+        const refresh = await screen.findByRole("button", {
+          name: messages.en.shared.pullToRefresh.refresh,
+        });
+        await waitFor(() => expect(refresh).toBeEnabled());
+        const comment = screen.getByRole("textbox", {
+          name: messages.en.workspace.problems.comment,
+        });
+        fireEvent.change(comment, { target: { value: "Keep this draft" } });
+        mocks.fetch.mockClear();
+        fireEvent.click(refresh);
+        await waitFor(() => expect(refresh).toBeEnabled());
+        expect(mocks.fetch).toHaveBeenCalledWith(
+          "/v1/problems/report",
+          expect.anything(),
+          { cache: "no-store" },
+        );
+        expect(mocks.fetch).toHaveBeenCalledWith(
+          expect.stringContaining("/v1/problems/report/activity"),
+          expect.anything(),
+          { cache: "no-store" },
+        );
+        expect(comment).toHaveValue("Keep this draft");
+        expect(
+          screen.getByRole("heading", { name: "Broken belt" }),
+        ).toBeVisible();
+      } finally {
+        window.matchMedia = previousMatchMedia;
+      }
+    },
+  );
+
   it("creates a todo using the issue form without scooter selection or condition", async () => {
     const user = userEvent.setup();
     const saved = vi.fn();
@@ -352,6 +413,16 @@ describe("problem release forms", () => {
     const title = await screen.findByRole("textbox", { name: "Title" });
     await user.type(title, " edited");
     await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(mocks.push).not.toHaveBeenCalled();
+    const confirmation = screen.getByRole("dialog", {
+      name: "Discard unsaved changes?",
+    });
+    await user.click(
+      within(confirmation).getByRole("button", { name: "Keep editing" }),
+    );
+    expect(title).toHaveValue("Broken belt edited");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await user.click(screen.getByRole("button", { name: "Discard changes" }));
     expect(mocks.push).toHaveBeenCalledWith("/en/todos/report");
     expect(
       mocks.fetch.mock.calls.some(
@@ -1336,46 +1407,70 @@ describe("problem release forms", () => {
     );
   });
 
-  it("adds checklist items in its editor and saves them", async () => {
-    const user = userEvent.setup();
-    renderForm(<ProblemWork compact problem={problem} reload={vi.fn()} />);
-    expect(screen.queryByRole("region", { name: "Checklist" })).toBeNull();
-    await user.click(screen.getByRole("button", { name: "Add" }));
-    await user.click(screen.getByRole("button", { name: "Checklist" }));
-    const sheet = await screen.findByRole("dialog", {
-      name: "Create checklist",
-    });
-    expect(sheet).toHaveClass("bg-popover");
-    expect(sheet.querySelector(".bg-background")).toBeNull();
-    const input = within(sheet).getByRole("textbox", {
-      name: "New checklist item",
-    });
-    await waitFor(() => expect(input).toHaveFocus());
-    await user.type(input, "Install pads{Enter}");
-    expect(within(sheet).getByText("Install pads")).toBeInTheDocument();
-    await user.click(
-      within(sheet).getByRole("button", { name: "Save checklist" }),
-    );
-    await waitFor(() =>
-      expect(mocks.fetch).toHaveBeenCalledWith(
-        "/v1/problems/report",
-        expect.anything(),
-        {
-          method: "PATCH",
-          json: {
-            revision: 3,
-            checklist: [
-              {
-                id: expect.any(String),
-                text: "Install pads",
-                completed: false,
-              },
-            ],
+  it.each([
+    {
+      section: "Checklist",
+      title: "Create checklist",
+      input: "New checklist item",
+      save: "Save checklist",
+      key: "checklist",
+    },
+    {
+      section: "Buy list",
+      title: "Create buy list",
+      input: "Item to buy",
+      save: "Save buy list",
+      key: "buyList",
+    },
+  ])(
+    "adds and edits items in the $section create sheet before saving",
+    async (list) => {
+      const user = userEvent.setup();
+      renderForm(<ProblemWork compact problem={problem} reload={vi.fn()} />);
+      expect(screen.queryByRole("region", { name: "Checklist" })).toBeNull();
+      await user.click(screen.getByRole("button", { name: "Add" }));
+      await user.click(screen.getByRole("button", { name: list.section }));
+      const sheet = await screen.findByRole("dialog", {
+        name: list.title,
+      });
+      expect(sheet).toHaveClass("bg-popover");
+      expect(sheet.querySelector(".bg-background")).toBeNull();
+      const input = within(sheet).getByRole("textbox", {
+        name: list.input,
+      });
+      await waitFor(() => expect(input).toHaveFocus());
+      await user.type(input, "Install pads{Enter}");
+      const item = within(sheet).getByRole("textbox", {
+        name: "Edit item: Install pads",
+      });
+      await user.click(item);
+      await user.keyboard("{End} and test brakes");
+      expect(item).toHaveValue("Install pads and test brakes");
+      await user.click(within(sheet).getByRole("button", { name: list.save }));
+      await waitFor(() =>
+        expect(mocks.fetch).toHaveBeenCalledWith(
+          "/v1/problems/report",
+          expect.anything(),
+          {
+            method: "PATCH",
+            json: {
+              revision: 3,
+              ...(list.key === "buyList"
+                ? { sections: ["checklist", "buyList"] }
+                : {}),
+              [list.key]: [
+                {
+                  id: expect.any(String),
+                  text: "Install pads and test brakes",
+                  completed: false,
+                },
+              ],
+            },
           },
-        },
-      ),
-    );
-  });
+        ),
+      );
+    },
+  );
 
   it("lets update-only administrators cancel a held problem from More actions", async () => {
     const user = userEvent.setup();
@@ -1677,7 +1772,10 @@ describe("dedicated creation screen", () => {
     const user = userEvent.setup();
     renderForm(<ProblemCreateScreen scooterId="scooter" />);
     const submit = screen.getByRole("button", { name: "Report problem" });
-    expect(submit.parentElement?.firstElementChild).toBe(submit);
+    expect(
+      screen.getByRole("button", { name: "Cancel" }).parentElement,
+    ).toHaveClass("hidden", "md:flex");
+    expect(submit.parentElement).not.toHaveClass("flex-col");
     expect(submit.closest('[data-slot="problem-create-actions"]')).toHaveClass(
       "static",
       "bottom-auto",

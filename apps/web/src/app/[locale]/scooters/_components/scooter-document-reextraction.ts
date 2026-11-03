@@ -8,6 +8,18 @@ import type {
 
 type Evidence = v1.scooters.ScooterDocumentExtractedData;
 type Success = Extract<DocumentImportResult, { ok: true }>;
+
+/** Classification-only attachments and protected copies have no data to re-read. */
+export function canReextractScooterDocument(
+  document: Pick<v1.scooters.ScooterDocument, "type" | "extractedData">,
+) {
+  return (
+    !document.extractedData?.clientCopy &&
+    v1.scooters
+      .scooterDocumentTypes(document)
+      .some(v1.scooters.scooterDocumentExtractsData)
+  );
+}
 export type ReextractionProposal = {
   id: string;
   kind: "field" | "policy" | "raw" | "document";
@@ -36,6 +48,28 @@ function evidenceSnapshot(value: Evidence) {
   const copy = { ...value };
   delete copy.reextractionHistory;
   return copy;
+}
+
+/** Reading changes need review; job metadata and classification-only layouts do not. */
+function readingSnapshot(type: string, evidence: Evidence) {
+  const readable = v1.scooters.scooterDocumentExtractionForType(type, evidence);
+  const documents = (readable.documents ?? [])
+    .filter((document) =>
+      v1.scooters.scooterDocumentExtractsData(document.documentType),
+    )
+    .map((document) => ({
+      documentType: document.documentType,
+      vin: document.vin,
+      fields: document.fields,
+      rawFields: document.rawFields,
+      inspections: document.inspections ?? [],
+    }));
+  return stableJson({
+    vin: readable.vin,
+    fields: readable.fields,
+    rawFields: readable.rawFields,
+    documents,
+  });
 }
 
 /** Keep old evidence, manual classifications and unreadable values intact. */
@@ -139,6 +173,10 @@ export function reextractionReview(
   const usable = analyses.filter(
     (analysis) =>
       !rejected.includes(analysis) &&
+      canReextractScooterDocument({
+        type: analysis.documentType,
+        extractedData: analysis.extractedData,
+      }) &&
       files.some((file) => file.id === analysis.sourceId),
   );
   const sources = files.map((file) => ({
@@ -271,7 +309,8 @@ export function reextractionReview(
     const next = evidenceSnapshot(
       mergeReextractedEvidence(file.extractedData, analysis.extractedData),
     );
-    if (stableJson(old) === stableJson(next)) continue;
+    if (readingSnapshot(file.type, old) === readingSnapshot(file.type, next))
+      continue;
     evidence[file.id] = next;
     proposals.push({
       id: `document:${file.id}`,

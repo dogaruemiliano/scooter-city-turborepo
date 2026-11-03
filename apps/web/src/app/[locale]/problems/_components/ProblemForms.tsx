@@ -1,6 +1,7 @@
 "use client";
 import { userAvatarSrc } from "@/lib/user-avatar";
 import { useFormAction } from "@/lib/form/use-form-action";
+import { useFormExitProtection } from "@/components/useFormExitProtection";
 import { SaveButton } from "@repo/ui/components/save-button";
 
 import {
@@ -67,6 +68,7 @@ import { useSession } from "@/components/auth/SessionProvider";
 import { canAccess } from "@/lib/access";
 import { webApi } from "@/lib/api";
 import { Feedback, useRemote, useTask } from "@/components/WorkspaceForm";
+import { usePageRefresh } from "@/components/PageRefresh";
 import { ProblemScooterPicker } from "./ProblemScooterPicker";
 import { ProblemSections, type ProblemSectionData } from "./ProblemSections";
 import { ProblemPhotos } from "./ProblemPhotos";
@@ -147,6 +149,34 @@ export function CreateProblem({
   const uploads = useRef(new Map<File, v1.problems.ProblemPhotoDraft>());
   const mayAssign = canAccess(user, "problems.assign", "ALL");
   const assignees = useProblemAssignees(mayAssign, todo);
+
+  const [initialValues] = useState(() =>
+    JSON.stringify({
+      scooterId,
+      title,
+      description,
+      difficulty,
+      blocksUsage,
+      assigneeIds,
+      sectionData,
+    }),
+  );
+  const exit = useFormExitProtection({
+    enabled: stickyActions,
+    dirty:
+      files.length > 0 ||
+      JSON.stringify({
+        scooterId,
+        title,
+        description,
+        difficulty,
+        blocksUsage,
+        assigneeIds,
+        sectionData,
+      }) !== initialValues,
+    pending: task.busy || galleryBusy || sectionsBusy,
+    onLeave: onCancel,
+  });
 
   const needsReload = Boolean(initialProblem && task.error === t("conflict"));
   const readyToSubmit = Boolean(
@@ -269,10 +299,12 @@ export function CreateProblem({
             ),
             variant: "success",
           });
+          exit.complete();
           onSaved(created);
         });
       }}
     >
+      {exit.protection}
       {initialProblem?.scooter ? (
         <p className="text-sm text-muted-foreground">
           {v1.scooters.scooterDisplayCode(initialProblem.scooter)} ·{" "}
@@ -508,13 +540,24 @@ export function CreateProblem({
       ) : null}
       <FormActions
         data-slot="problem-create-actions"
-        arrangement="split"
+        arrangement={stickyActions ? undefined : "split"}
+        secondaryAction={
+          onCancel ? (
+            <Button
+              variant="outline"
+              type="button"
+              disabled={task.busy}
+              onClick={stickyActions ? exit.requestLeave : onCancel}
+            >
+              {t("cancel")}
+            </Button>
+          ) : null
+        }
         ready={stickyActions ? readyToSubmit : undefined}
         pending={task.busy}
         className={stickyActions ? "mt-auto w-full" : undefined}
       >
         <SaveButton
-          className={stickyActions ? "w-full" : undefined}
           type="submit"
           disabled={task.busy || !readyToSubmit}
           {...formAction(initialProblem ? "save" : "report", {
@@ -529,16 +572,6 @@ export function CreateProblem({
               }
             : {})}
         />
-        {onCancel ? (
-          <Button
-            variant="outline"
-            type="button"
-            disabled={task.busy}
-            onClick={onCancel}
-          >
-            {t("cancel")}
-          </Button>
-        ) : null}
       </FormActions>
     </form>
   );
@@ -1123,6 +1156,10 @@ function ProblemActivity({
     [problemId, page, kind],
   );
   const remote = useRemote(load);
+  usePageRefresh(remote.reload, {
+    refreshing: remote.loading,
+    contributor: true,
+  });
   const [latestPage, setLatestPage] = useState<typeof remote.data>(null);
   if (
     kind === "activity" &&
@@ -1174,7 +1211,7 @@ function ProblemActivity({
           {t("retry")}
         </Button>
       ) : null}
-      {remote.loading ? (
+      {remote.loading && !remote.data ? (
         <p role="status" className="text-sm text-muted-foreground">
           {t("loading")}
         </p>

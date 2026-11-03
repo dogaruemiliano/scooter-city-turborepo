@@ -1,9 +1,17 @@
+import { spacing } from "./spacing";
+
 /**
  * Motion tokens. Durations in ms; easings as cubic-bezier (web) — RN consumers can use the same
  * curve via Reanimated's Easing.bezier(...).
  */
 export const motion = {
   gesture: {
+    pullToRefresh: {
+      axisLockDistance: spacing[2],
+      threshold: spacing[24],
+      maxTravel: spacing[16],
+      resistance: 0.5,
+    },
     wizard: {
       axisLockDistance: 8,
       commitFraction: 0.25,

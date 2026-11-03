@@ -91,6 +91,60 @@ beforeEach(() => {
 });
 
 describe("AccountSettings", () => {
+  it("loads and saves notification preferences from the account settings section", async () => {
+    const preferences = { pushEnabled: true, mutedCategories: [] };
+    mocks.apiFetch.mockImplementation(
+      (path: string, _schema: unknown, options?: { json?: unknown }) =>
+        Promise.resolve(
+          path === v1.notifications.ROUTES.preferences
+            ? (options?.json ?? preferences)
+            : { configured: false, publicKey: null },
+        ),
+    );
+    const browser = userEvent.setup();
+    renderSettings({
+      ...user,
+      effectiveScopes: { "notifications.receive": ["ASSIGNED"] },
+    });
+    const section = screen.getByRole("region", {
+      name: "Notification settings",
+    });
+    expect(section).toHaveAttribute("id", "notifications");
+    const toggle = await within(section).findByRole("switch", {
+      name: "Allow push notifications",
+    });
+    await browser.click(toggle);
+    await browser.click(
+      within(section).getByRole("button", {
+        name: "Save notification preferences",
+      }),
+    );
+    expect(mocks.apiFetch).toHaveBeenCalledWith(
+      v1.notifications.ROUTES.preferences,
+      v1.notifications.notificationPreferencesSchema,
+      { method: "PATCH", json: { ...preferences, pushEnabled: false } },
+    );
+    expect(
+      await within(section).findByRole("button", {
+        name: "Notification preferences saved",
+      }),
+    ).toBeDisabled();
+  });
+
+  it("does not load notification settings for accounts without notification access", () => {
+    renderSettings();
+    expect(
+      screen.queryByRole("region", { name: "Notification settings" }),
+    ).not.toBeInTheDocument();
+    expect(
+      mocks.apiFetch.mock.calls.some(
+        ([path]) =>
+          path === v1.notifications.ROUTES.preferences ||
+          path === v1.notifications.ROUTES.pushConfig,
+      ),
+    ).toBe(false);
+  });
+
   it("uploads a profile image, updates the session, and removes it", async () => {
     const browser = userEvent.setup();
     const withAvatar = { ...user, avatarAssetId: "avatar-1" };
@@ -264,7 +318,23 @@ describe("AccountSettings", () => {
 
     renderSettings();
     await browser.click(screen.getByRole("button", { name: "Delete account" }));
+    const initialDialog = await screen.findByRole("dialog");
+    expect(
+      within(initialDialog).queryByRole("button", { name: "Cancel" }),
+    ).not.toBeInTheDocument();
+    await browser.type(
+      within(initialDialog).getByLabelText("Confirmation"),
+      "DELETE",
+    );
+    await browser.click(
+      within(initialDialog).getByRole("button", { name: "Close" }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    await browser.click(screen.getByRole("button", { name: "Delete account" }));
     const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByLabelText("Confirmation")).toHaveValue("");
     const deleteButton = within(dialog).getByRole("button", {
       name: "Delete account",
     });
@@ -283,7 +353,7 @@ describe("AccountSettings", () => {
   });
 });
 
-function renderSettings() {
+function renderSettings(initialUser = user) {
   return render(
     <NextIntlClientProvider locale="en" messages={messages.en}>
       <WorkspaceNotifications>
@@ -296,7 +366,7 @@ function renderSettings() {
         >
           <SessionUserProbe />
           <AccountSettings
-            initialUser={user}
+            initialUser={initialUser}
             initialSessions={sessions}
             enabledMethods={["emailOtp", "google"]}
           />

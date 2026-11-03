@@ -1,4 +1,5 @@
 import { v1 } from "@repo/api-shared";
+import { PageRefreshSurface } from "@/components/PageRefresh";
 import { messages, type SupportedLocale } from "@repo/i18n";
 import {
   act,
@@ -735,6 +736,55 @@ describe("ScootersPage", () => {
 
     expect(await screen.findByText("Honda PCX")).toBeInTheDocument();
   });
+});
+
+it("refreshes the mobile scooter list with its current search, filters and sort", async () => {
+  const previousMatchMedia = window.matchMedia;
+  window.matchMedia = vi.fn().mockReturnValue({
+    matches: true,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  } as unknown as MediaQueryList);
+  try {
+    const query = v1.scooters.listScootersQuerySchema.parse({
+      search: "yam",
+      powertrainType: "combustion",
+      sort: "fleetNumberDesc",
+    });
+    mocks.apiFetch.mockResolvedValueOnce(
+      scooterList([scooterRecord({ model: "Refreshed model" })]),
+    );
+    render(
+      <NextIntlClientProvider locale="en" messages={messages.en}>
+        <div>
+          <PageRefreshSurface>
+            <ScootersPage
+              createHref="/en/scooters/new"
+              initialList={scooterList([scooter])}
+              initialQuery={query}
+            />
+          </PageRefreshSurface>
+        </div>
+      </NextIntlClientProvider>,
+    );
+    const historyLength = window.history.length;
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: messages.en.shared.pullToRefresh.refresh,
+      }),
+    );
+    await screen.findByText(/Refreshed model/);
+    const path = mocks.apiFetch.mock.calls[0]![0] as string;
+    const params = new URL(path, "http://localhost").searchParams;
+    expect(params.get("search")).toBe("yam");
+    expect(params.get("powertrainType")).toBe("combustion");
+    expect(params.get("sort")).toBe("fleetNumberDesc");
+    expect(params.get("page")).toBe("1");
+    expect(window.history.length).toBe(historyLength);
+    expect(window.location.search).toContain("search=yam");
+  } finally {
+    window.matchMedia = previousMatchMedia;
+  }
 });
 
 function renderScooters(

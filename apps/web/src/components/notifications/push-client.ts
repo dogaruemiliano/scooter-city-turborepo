@@ -105,10 +105,13 @@ export async function registerPush(
   publicKey: string,
   locale: SupportedLocale,
   userId: string,
+  signal?: AbortSignal,
 ): Promise<void> {
   // This function is called only from the explicit enable action. Permission
   // is requested before asynchronous registration to retain the user gesture.
+  signal?.throwIfAborted();
   const permission = await Notification.requestPermission();
+  signal?.throwIfAborted();
   if (permission !== "granted")
     throw new Error("Push permission was not granted");
   const registration = await navigator.serviceWorker.register(
@@ -116,6 +119,7 @@ export async function registerPush(
     { scope: "/", updateViaCache: "none" },
   );
   await navigator.serviceWorker.ready;
+  signal?.throwIfAborted();
   const subscription =
     (await registration.pushManager.getSubscription()) ??
     (await registration.pushManager.subscribe({
@@ -129,11 +133,13 @@ export async function registerPush(
     locale,
   });
   try {
+    signal?.throwIfAborted();
     await webApi.fetch(
       v1.notifications.ROUTES.pushSubscriptions,
       v1.notifications.notificationMutationResultSchema,
-      { method: "POST", json: input },
+      { method: "POST", json: input, ...(signal ? { signal } : {}) },
     );
+    signal?.throwIfAborted();
     setPushOwner(userId);
   } catch (error) {
     // An unbound destination must not appear enabled on a shared device.

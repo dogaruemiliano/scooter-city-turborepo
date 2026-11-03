@@ -1,7 +1,8 @@
 import { messages } from "@repo/i18n";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { requireAccess } from "@/lib/access-server";
-import { resolveRouteLocale } from "@/i18n/paths";
+import { localizePath, resolveRouteLocale } from "@/i18n/paths";
 import { NotificationsWorkspace } from "./_components/NotificationsWorkspace";
 
 interface PageProps {
@@ -23,17 +24,19 @@ export default async function Page({ params, searchParams }: PageProps) {
     "/notifications",
     "notifications.receive",
   );
-  const tab =
-    query.tab === "settings" || query.tab === "activity" ? query.tab : "inbox";
+  if (query.tab === "settings") {
+    redirect(
+      localizePath(
+        "/account/settings#notifications",
+        resolveRouteLocale(locale),
+      ),
+    );
+  }
   const openId =
     typeof query.open === "string" && query.open.length <= 200
       ? query.open
       : undefined;
   return (
-    <NotificationsWorkspace
-      key={`${tab}:${openId ?? ""}`}
-      initialTab={tab}
-      openId={openId}
-    />
+    <NotificationsWorkspace key={openId ?? "notifications"} openId={openId} />
   );
 }

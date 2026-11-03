@@ -135,7 +135,20 @@ function DocumentPersonCreateForm({
   const [hasSubmittedPhoto, setHasSubmittedPhoto] = useState(false);
   const hasUploadedPhoto = hasDocumentPhotoStatus(form, "uploaded");
   if (hasUploadedPhoto && !hasSubmittedPhoto) setHasSubmittedPhoto(true);
-  const leaveGuard = useWizardLeaveGuard(hasSubmittedPhoto || hasUploadedPhoto);
+  const [initialForm] = useState(() => JSON.stringify(form));
+  const leaveGuard = useWizardLeaveGuard(
+    hasSubmittedPhoto ||
+      hasUploadedPhoto ||
+      JSON.stringify(form) !== initialForm,
+    {
+      blocked: creating,
+      onBrowserBack: () => {
+        if (!canGoBack) return false;
+        goBack();
+        return true;
+      },
+    },
+  );
   const extraction = useDocumentExtraction(
     extractionState,
     setExtractionState,
@@ -457,7 +470,16 @@ function DocumentPersonCreateForm({
         ) : null}
         <div className="px-(--page-gutter)">
           <PageHeaderNavigation
-            onBack={canGoBack ? goBack : undefined}
+            onBack={() => {
+              if (creating) return;
+              if (canGoBack) goBack();
+              else
+                leaveGuard.requestLeave(() =>
+                  router.replace(
+                    personCreateCancelHref(personsHref, rentalDraftId),
+                  ),
+                );
+            }}
             backDisabled={creating}
             forwardAction={
               forwardStepLabel

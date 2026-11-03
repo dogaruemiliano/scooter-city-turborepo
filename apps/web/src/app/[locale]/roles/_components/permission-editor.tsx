@@ -392,7 +392,7 @@ export function PermissionEditor({
           <TabsList
             variant="line"
             aria-label={t("categories")}
-            className="w-full shrink-0 gap-0 overflow-x-auto rounded-none border-b border-border p-0"
+            className="w-full shrink-0 gap-0 overflow-x-auto rounded-none border-b border-border py-0"
           >
             {groups.map((group) => (
               <TabsTrigger

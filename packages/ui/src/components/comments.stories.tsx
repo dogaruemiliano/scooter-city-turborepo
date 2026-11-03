@@ -55,6 +55,7 @@ function Conversation({
   disabled = false,
   withRecovery = false,
   expanded = false,
+  initialDraft,
 }: {
   empty?: boolean;
   readOnly?: boolean;
@@ -64,16 +65,18 @@ function Conversation({
   disabled?: boolean;
   withRecovery?: boolean;
   expanded?: boolean;
+  initialDraft?: string;
 }) {
   const [newCommentIndex, setNewCommentIndex] = useState<number | null>(null);
   const [recovered, setRecovered] = useState(false);
   const [comments, setComments] = useState(empty ? [] : initialComments);
   const [draft, setDraft] = useState(
-    expanded
-      ? "Checked the brake pads.\nReplacement parts arrived.\nBrake fluid checked.\nFitting is complete.\nFinal inspection pending.\nRoad test is next.\nLeave the inspection notes at the workshop."
-      : state === "idle" || state === "success"
-        ? ""
-        : "The brake fluid has been checked. Ready for the final inspection.",
+    initialDraft ??
+      (expanded
+        ? "Checked the brake pads.\nReplacement parts arrived.\nBrake fluid checked.\nFitting is complete.\nFinal inspection pending.\nRoad test is next.\nLeave the inspection notes at the workshop."
+        : state === "idle" || state === "success"
+          ? ""
+          : "The brake fluid has been checked. Ready for the final inspection."),
   );
   return (
     <CommentThread
@@ -145,6 +148,17 @@ function Conversation({
 
 export const ConversationThread: Story = { render: () => <Conversation /> };
 export const Empty: Story = { render: () => <Conversation empty /> };
+export const SingleLineDraft: Story = {
+  render: () => <Conversation empty initialDraft="Inspection complete." />,
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Placeholder and single-line drafts are vertically centered beside the send button. Multiline drafts grow while the send button stays at the lower right.",
+      },
+    },
+  },
+};
 export const ReadOnly: Story = { render: () => <Conversation readOnly /> };
 export const Pending: Story = {
   render: () => <Conversation state="pending" />,

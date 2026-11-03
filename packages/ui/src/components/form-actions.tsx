@@ -6,6 +6,8 @@ import { Card, CardContent } from "./card";
 type FormActionsProps = ComponentProps<"div"> & {
   /** Context for the actions, such as validation feedback or a draft status. */
   status?: ReactNode;
+  /** Cancel or Back. Page action bars show this only on desktop; mobile uses the header. */
+  secondaryAction?: ReactNode;
   buttonLayout?: "equal" | "primary";
   sticky?: boolean;
   /** Compact padding and action spacing for short floating save bars. */
@@ -14,13 +16,14 @@ type FormActionsProps = ComponentProps<"div"> & {
   ready?: boolean;
   /** Keeps ready actions visible while submission is in progress. */
   pending?: boolean;
-  /** Confirm first on mobile; cancel left and confirm right on desktop. Put confirm first in children. */
+  /** Contained footers: confirm first on mobile, cancel left on desktop. Page bars always use one row. */
   arrangement?: "default" | "split";
 };
 
 function FormActions({
   className,
   status,
+  secondaryAction,
   buttonLayout = "equal",
   sticky = false,
   density = "default",
@@ -30,12 +33,26 @@ function FormActions({
   children,
   ...props
 }: FormActionsProps) {
+  const pageActions = sticky || ready !== undefined;
   // Split actions occupy the full row. Keep status above them so it cannot
   // shrink to a column of single characters beside a full-width button group.
   const layout =
-    arrangement === "split"
+    pageActions || arrangement === "split"
       ? "flex min-w-0 flex-col gap-3"
       : "flex min-w-0 flex-col gap-3 @form-columns/form-actions:flex-row @form-columns/form-actions:items-center @form-columns/form-actions:justify-end";
+  const secondary =
+    secondaryAction != null ? (
+      <div
+        data-slot="form-actions-secondary"
+        className={
+          pageActions
+            ? "hidden md:mr-auto md:flex md:items-center md:gap-3"
+            : "contents"
+        }
+      >
+        {secondaryAction}
+      </div>
+    ) : null;
   const content = (
     <>
       {status != null ? (
@@ -48,16 +65,21 @@ function FormActions({
       ) : null}
       <div
         className={cn(
-          arrangement === "split"
-            ? "flex w-full min-w-0 flex-col *:min-w-0 *:max-w-full md:flex-row-reverse md:items-center md:justify-between"
-            : buttonLayout === "primary"
-              ? "grid w-full min-w-0 grid-cols-(--container-primary-form-actions) items-center gap-3 *:min-w-0 *:max-w-full *:w-full"
-              : "flex w-full min-w-0 flex-wrap items-center justify-end gap-3 *:min-w-0 *:max-w-full *:flex-1 @form-columns/form-actions:w-auto @form-columns/form-actions:*:flex-none",
-          arrangement === "split" &&
+          pageActions
+            ? "flex w-full min-w-0 items-center justify-end gap-3 *:min-w-0 *:max-w-full *:flex-1 md:*:flex-initial"
+            : arrangement === "split"
+              ? "flex w-full min-w-0 flex-col *:min-w-0 *:max-w-full md:flex-row-reverse md:items-center md:justify-between"
+              : buttonLayout === "primary"
+                ? "grid w-full min-w-0 grid-cols-(--container-primary-form-actions) items-center gap-3 *:min-w-0 *:max-w-full *:w-full"
+                : "flex w-full min-w-0 flex-wrap items-center justify-end gap-3 *:min-w-0 *:max-w-full *:flex-1 @form-columns/form-actions:w-auto @form-columns/form-actions:*:flex-none",
+          !pageActions &&
+            arrangement === "split" &&
             (density === "compact" ? "gap-2" : "gap-6"),
         )}
       >
+        {pageActions || arrangement !== "split" ? secondary : null}
         {children}
+        {!pageActions && arrangement === "split" ? secondary : null}
       </div>
     </>
   );

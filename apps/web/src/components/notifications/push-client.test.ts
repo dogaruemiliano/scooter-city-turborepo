@@ -1,6 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { v1 } from "@repo/api-shared";
-import { synchronizePushSubscription } from "./push-client";
+import { registerPush, synchronizePushSubscription } from "./push-client";
 
 const mocks = vi.hoisted(() => ({ fetch: vi.fn() }));
 vi.mock("@/lib/api", () => ({ webApi: { fetch: mocks.fetch } }));
@@ -51,6 +51,29 @@ afterEach(() => {
 });
 
 describe("existing push ownership", () => {
+  it("requests browser permission synchronously from the enable action", async () => {
+    requestPermission.mockResolvedValue("default");
+    const result = registerPush("public", "en", "user-1");
+    expect(requestPermission).toHaveBeenCalledTimes(1);
+    await expect(result).rejects.toThrow("permission was not granted");
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+
+  it("does not register or bind a destination if the account leaves during permission consent", async () => {
+    let finish!: (permission: NotificationPermission) => void;
+    requestPermission.mockImplementation(
+      () =>
+        new Promise<NotificationPermission>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const controller = new AbortController();
+    const result = registerPush("public", "en", "user-1", controller.signal);
+    controller.abort();
+    finish("granted");
+    await expect(result).rejects.toMatchObject({ name: "AbortError" });
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
   it("rebinds same-account subscriptions to the current authenticated session without prompting", async () => {
     localStorage.setItem("scooter-notifications-owner:v1", "user-1");
     await synchronizePushSubscription("user-1", "ro");

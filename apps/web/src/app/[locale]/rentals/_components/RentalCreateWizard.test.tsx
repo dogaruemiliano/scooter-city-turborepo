@@ -665,7 +665,7 @@ it("autosaves first-step edits and offers a safe exit without losing them", asyn
 });
 
 it.each(["details", "review"] as const)(
-  "offers save/discard from the header on %s and can keep editing",
+  "navigates back within the wizard before offering save/discard on %s",
   async (step) => {
     const draft = { ...completeDraft(), step };
     writeRentalDraft("staff", draft);
@@ -687,6 +687,13 @@ it.each(["details", "review"] as const)(
       }),
     ).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Header back" }));
+    if (step === "review") {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Continue to review" }),
+      ).toBeEnabled();
+      await user.click(screen.getByRole("button", { name: "Header back" }));
+    }
     let dialog = await screen.findByRole("dialog", {
       name: "Leave rental creation?",
     });
@@ -710,7 +717,10 @@ it.each(["details", "review"] as const)(
     ).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
-    expect(readRentalDraft("staff")).toEqual(draft);
+    expect(readRentalDraft("staff")).toMatchObject({
+      ...draft,
+      step: "details",
+    });
     expect(mocks.replace).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Header back" }));
     dialog = await screen.findByRole("dialog", {
@@ -720,7 +730,10 @@ it.each(["details", "review"] as const)(
       within(dialog).getByRole("button", { name: "Save draft" }),
     );
     expect(mocks.replace).toHaveBeenCalledWith("/rentals");
-    expect(readRentalDraft("staff")).toEqual(draft);
+    expect(readRentalDraft("staff")).toMatchObject({
+      ...draft,
+      step: "details",
+    });
     expect(mocks.post).not.toHaveBeenCalled();
   },
 );

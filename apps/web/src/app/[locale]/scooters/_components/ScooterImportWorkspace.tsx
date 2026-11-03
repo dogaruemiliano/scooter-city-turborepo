@@ -1,5 +1,8 @@
 "use client";
 
+import { PageHeaderNavigation } from "@/components/PageHeaderNavigation";
+import { useWizardLeaveGuard } from "@/components/useWizardLeaveGuard";
+
 import { ApiError, v1 } from "@repo/api-shared";
 import {
   Badge,
@@ -93,6 +96,18 @@ export function ScooterImportWorkspace({
   const [selectedId, setSelectedId] = useState<string>();
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
+  const [submittingDrafts, setSubmittingDrafts] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const onSubmittingChange = useCallback((id: string, submitting: boolean) => {
+    setSubmittingDrafts((current) => {
+      if (current.has(id) === submitting) return current;
+      const next = new Set(current);
+      if (submitting) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
   const [discarding, setDiscarding] = useState<string>();
   const [discardTarget, setDiscardTarget] = useState<string>();
   const [discardError, setDiscardError] = useState<string>();
@@ -533,8 +548,23 @@ export function ScooterImportWorkspace({
   const canAddDraft =
     !loading && drafts.every((entry) => entry.documentCount > 0);
 
+  const leavingBlocked =
+    submittingDrafts.size > 0 ||
+    adding ||
+    Boolean(discarding) ||
+    savingRecovery;
+  const navigationGuard = useWizardLeaveGuard(false, {
+    blocked: leavingBlocked,
+  });
+
   return (
     <PageLayout>
+      <PageHeaderNavigation
+        backDisabled={leavingBlocked}
+        onBack={() =>
+          navigationGuard.requestLeave(() => router.replace(scootersHref))
+        }
+      />
       <ScooterFleetNumberRefreshContext value={fleetNumberRevision}>
         <div ref={workspaceRef} className="grid min-w-0 gap-6">
           {multipleDrafts || canAddDraft ? (
@@ -542,12 +572,13 @@ export function ScooterImportWorkspace({
               key={multipleDrafts ? "drafts" : "add"}
               label={t("drafts")}
               fadeEdges
+              fadeWidth="var(--page-gutter)"
               scrollbarVisibility="desktop"
-              className={`-mx-(--page-gutter) w-auto md:mx-0 md:w-full animate-in fade-in-0 slide-in-from-top-2 duration-normal ease-decelerate motion-reduce:animate-none ${multipleDrafts ? "" : "hidden md:block"}`}
+              className={`-mx-(--page-gutter) w-auto animate-in fade-in-0 slide-in-from-top-2 duration-normal ease-decelerate motion-reduce:animate-none ${multipleDrafts ? "" : "hidden md:block"}`}
             >
               <nav
                 aria-label={t("drafts")}
-                className="flex w-max min-w-full items-center gap-2 px-(--page-gutter) py-2 md:px-0"
+                className="flex w-max min-w-full items-center gap-2 px-(--page-gutter) py-2"
               >
                 {drafts.map(({ draft, status }, index) =>
                   selectedId !== draft.id ? (
@@ -705,6 +736,7 @@ export function ScooterImportWorkspace({
                     importDraft={draft}
                     initialSnapshot={initialSnapshot}
                     onSnapshot={(state) => snapshot(draft, state)}
+                    onSubmittingChange={onSubmittingChange}
                     onCreated={(scooter) => complete(draft.id, scooter)}
                     brands={brands}
                     vocabulary={vocabulary}

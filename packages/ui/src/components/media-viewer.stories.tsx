@@ -52,7 +52,15 @@ const props = {
 const meta = {
   title: "Media/MediaViewer",
   component: MediaViewer,
-  parameters: { layout: "fullscreen" },
+  parameters: {
+    layout: "fullscreen",
+    docs: {
+      description: {
+        component:
+          "On desktop, clicking the dark backdrop closes the preview. Interactions inside the viewer keep it open, and backdrop dismissal is blocked while changes are being saved. Mobile uses a full-screen surface with the existing close control.",
+      },
+    },
+  },
   tags: ["autodocs"],
 } satisfies Meta<typeof MediaViewer>;
 export default meta;

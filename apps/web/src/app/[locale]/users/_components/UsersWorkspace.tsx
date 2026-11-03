@@ -769,6 +769,7 @@ function UserForm({
                   </BottomSheetTrigger>
                   <BottomSheetContent
                     aria-label={permissionText("customizePermissions")}
+                    desktopSize="wide"
                   >
                     <BottomSheetBody className="pt-0">
                       <PermissionEditor

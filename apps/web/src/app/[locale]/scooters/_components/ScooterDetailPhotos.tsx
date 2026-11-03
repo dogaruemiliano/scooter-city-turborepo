@@ -8,6 +8,7 @@ import { Button, FormSection } from "@repo/ui/components";
 import { HorizontalScrollArea } from "@repo/ui/components/horizontal-scroll-area";
 import { ImageViewer } from "@repo/ui/components/image-viewer";
 import { useRemote } from "@/components/WorkspaceForm";
+import { usePageRefresh } from "@/components/PageRefresh";
 import { webApi } from "@/lib/api";
 
 /** Read-only photo rail for persisted scooters; editing belongs in the editor. */
@@ -24,6 +25,10 @@ export function ScooterDetailPhotos({ scooterId }: { scooterId: string }) {
     [scooterId],
   );
   const remote = useRemote(load);
+  usePageRefresh(remote.reload, {
+    refreshing: remote.loading,
+    contributor: true,
+  });
   const images = (remote.data ?? []).map((photo) => ({
     id: photo.id,
     src: webApi.url(photo.contentUrl),
@@ -33,11 +38,12 @@ export function ScooterDetailPhotos({ scooterId }: { scooterId: string }) {
 
   return (
     <FormSection title={t("title")} columns={1} panel>
-      {remote.loading ? (
+      {remote.loading && !remote.data ? (
         <p role="status" className="text-sm text-muted-foreground">
           {t("loading")}
         </p>
-      ) : remote.error ? (
+      ) : null}
+      {remote.error ? (
         <div
           role="alert"
           className="flex flex-wrap items-center gap-3 text-sm text-destructive"
@@ -47,7 +53,8 @@ export function ScooterDetailPhotos({ scooterId }: { scooterId: string }) {
             {t("retry")}
           </Button>
         </div>
-      ) : images.length ? (
+      ) : null}
+      {images.length ? (
         <HorizontalScrollArea
           label={t("title")}
           fadeEdges="always"
@@ -81,9 +88,9 @@ export function ScooterDetailPhotos({ scooterId }: { scooterId: string }) {
             ))}
           </ul>
         </HorizontalScrollArea>
-      ) : (
+      ) : remote.data ? (
         <p className="text-sm text-muted-foreground">{t("emptyReadOnly")}</p>
-      )}
+      ) : null}
       <ImageViewer
         open={activeId !== null}
         onOpenChange={(open) => {

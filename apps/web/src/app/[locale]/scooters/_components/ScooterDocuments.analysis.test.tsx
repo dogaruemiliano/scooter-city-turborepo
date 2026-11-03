@@ -54,6 +54,12 @@ describe("Scooter documents", () => {
     );
     await screen.findByText("Details extracted");
     await waitFor(() => expect(finish).toBeDefined());
+    const pendingAction = screen.getByRole("button", {
+      name: "Analyzing 1 of 2…",
+    });
+    expect(pendingAction).toBeDisabled();
+    expect(pendingAction).toHaveAttribute("aria-busy", "true");
+    expect(pendingAction.querySelector('[data-slot="spinner"]')).not.toBeNull();
     expect(
       screen.queryByRole("button", { name: "Validate the documents" }),
     ).not.toBeInTheDocument();

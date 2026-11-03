@@ -1,6 +1,37 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { formatNotificationMessage } from "../src";
+import {
+  formatNotificationMessage,
+  formatNotificationMessageParts,
+} from "../src";
+
+test("structured notification copy preserves the sentence and treats names as literal values", () => {
+  for (const locale of ["en", "ro"]) {
+    const input = {
+      type: "issue.commented",
+      actorName: "Maria {subject}",
+      subjectLabel: "Maria <b>repair</b>",
+    };
+    const parts = formatNotificationMessageParts(locale, input);
+    assert.equal(
+      parts.map((part) => part.text).join(""),
+      formatNotificationMessage(locale, input).body,
+    );
+    assert.deepEqual(
+      parts.filter((part) => part.kind !== "text").map((part) => part.text),
+      [input.actorName, input.subjectLabel],
+    );
+  }
+  assert.deepEqual(
+    formatNotificationMessageParts("en", {
+      type: "issue.assigned",
+      reason: "unassigned",
+      actorName: "Private",
+      subjectLabel: "Private task",
+    }),
+    [{ kind: "text", text: "A job was removed from your assignments." }],
+  );
+});
 
 test("notification messages use the same localized sentence for inbox and push", () => {
   const input = {

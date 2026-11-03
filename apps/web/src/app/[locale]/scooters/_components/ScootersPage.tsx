@@ -26,6 +26,7 @@ import {
 } from "react";
 
 import { InfiniteListFooter } from "@/components/InfiniteListFooter";
+import { usePageRefresh } from "@/components/PageRefresh";
 import { ListSearchInput } from "@/components/ListSearchInput";
 import { webApi } from "@/lib/api";
 import { ScooterList } from "./ScooterList";
@@ -199,6 +200,14 @@ function ScootersPageContent({
       }
     },
     [isCurrentRequest, t],
+  );
+
+  usePageRefresh(
+    () => {
+      clearSearchDebounce();
+      void loadScooters(draftQuery, { history: "replace" });
+    },
+    { refreshing: listLoading, disabled: appendLoading },
   );
 
   const loadNextScootersPage = useCallback(async () => {

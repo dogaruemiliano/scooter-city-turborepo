@@ -20,6 +20,7 @@ import { useOptionalSession } from "@/components/auth/SessionProvider";
 import { useWorkspaceNotifications } from "@/components/WorkspaceNotifications";
 import { localizePath } from "@/i18n/paths";
 import { NotificationChanges } from "./NotificationItem";
+import { PushPermissionPrompt } from "./PushPermissionPrompt";
 import {
   clearPushForOtherAccount,
   synchronizePushSubscription,
@@ -91,26 +92,45 @@ function NotificationSession({
   const ownedToasts = useRef(new Set<string>());
   const channelRef = useRef<BroadcastChannel | null>(null);
   const unreadRef = useRef<number | null>(null);
+  const recentRef = useRef<v1.notifications.Notification[] | null>(null);
+  const readVersion = useRef(0);
+  const refreshVersion = useRef(0);
   useEffect(() => {
     toastRef.current = toast;
   }, [toast]);
 
   const refresh = useCallback(async () => {
+    const version = readVersion.current;
+    const request = ++refreshVersion.current;
     const result = await webApi.fetch(
       `${v1.notifications.ROUTES.list}?limit=5`,
       v1.notifications.notificationListSchema,
       { cache: "no-store" },
     );
-    if (!alive.current) return;
+    if (
+      !alive.current ||
+      version !== readVersion.current ||
+      request !== refreshVersion.current
+    )
+      return;
     setRecent(result.items);
     setUnreadCount(result.unreadCount);
+    const previous = recentRef.current;
+    const newHead =
+      previous !== null &&
+      result.items.some(
+        (item) =>
+          !previous.some((known) => known.id === item.id) &&
+          (!previous.length || item.createdAt >= previous[0]!.createdAt),
+      );
     if (
       unreadRef.current !== null &&
-      unreadRef.current !== result.unreadCount
+      (unreadRef.current !== result.unreadCount || newHead)
     ) {
       window.dispatchEvent(new CustomEvent("notifications-updated"));
     }
     unreadRef.current = result.unreadCount;
+    recentRef.current = result.items;
     setError(false);
   }, []);
 
@@ -126,6 +146,7 @@ function NotificationSession({
         v1.notifications.notificationMutationResultSchema,
         { method: "PATCH", json: {} },
       );
+      readVersion.current += 1;
       if (!alive.current) return;
       await refresh();
       notifyReadChange();
@@ -140,6 +161,7 @@ function NotificationSession({
         v1.notifications.notificationMutationResultSchema,
         { method: "POST", json: { cutoff } },
       );
+      readVersion.current += 1;
       if (!alive.current) return;
       await refresh();
       notifyReadChange();
@@ -188,12 +210,17 @@ function NotificationSession({
       polling = true;
       try {
         await flushReceipts();
+        const version = readVersion.current;
         const result = await webApi.fetch(
           `${v1.notifications.ROUTES.list}?pending=true&limit=10`,
           v1.notifications.notificationListSchema,
           { cache: "no-store", signal: controller.signal },
         );
         if (cancelled || !appIsForeground()) return;
+        if (version !== readVersion.current) {
+          await refresh();
+          return;
+        }
         setUnreadCount(result.unreadCount);
         setError(false);
         const currentToast = toastRef.current;
@@ -267,6 +294,7 @@ function NotificationSession({
   return (
     <NotificationContext.Provider value={value}>
       {children}
+      <PushPermissionPrompt userId={userId} />
     </NotificationContext.Provider>
   );
 }

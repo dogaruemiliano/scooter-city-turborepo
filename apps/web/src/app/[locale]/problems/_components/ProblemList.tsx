@@ -37,9 +37,14 @@ export function ProblemList({
   return (
     <HorizontalScrollArea
       label={t("boardLabel")}
+      fadeEdges
+      fadeWidth="var(--page-gutter)"
+      className="-mx-(--page-gutter) w-auto"
+      scrollbarVisibility="hidden"
+      scrollLeftLabel={t("scrollLeft")}
       scrollRightLabel={t("scrollRight")}
     >
-      <div className="flex min-w-0 flex-col gap-4 lg:grid lg:grid-cols-[repeat(4,minmax(var(--spacing-72),1fr))] lg:items-start lg:gap-6">
+      <div className="flex min-w-0 flex-col gap-4 px-(--page-gutter) lg:grid lg:min-w-[calc(var(--spacing-72)*4+var(--spacing-6)*3+var(--page-gutter)*2)] lg:grid-cols-[repeat(4,minmax(var(--spacing-72),1fr))] lg:items-start lg:gap-6">
         {v1.problems.problemStatusSchema.options.map((lane) => {
           const problems = items.filter((problem) => problem.status === lane);
           return (

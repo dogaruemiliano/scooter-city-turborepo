@@ -1,8 +1,13 @@
+import {
+  PageHeaderNavigationContext,
+  type PageHeaderNavigationOptions,
+} from "@/components/PageHeaderNavigation";
 import { PageHeaderActionsContext } from "@/components/PageHeaderActions";
 import { ApiError, v1 } from "@repo/api-shared";
 import { scrollFade } from "@repo/theme";
 import { messages } from "@repo/i18n";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -23,9 +28,18 @@ const mocks = vi.hoisted(() => ({
   toast: vi.fn(),
   push: vi.fn(),
   refresh: vi.fn(),
+  replace: vi.fn(),
+  registerNavigation: vi.fn((options: PageHeaderNavigationOptions) => {
+    void options;
+    return () => {};
+  }),
 }));
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: mocks.push, refresh: mocks.refresh }),
+  useRouter: () => ({
+    push: mocks.push,
+    refresh: mocks.refresh,
+    replace: mocks.replace,
+  }),
 }));
 vi.mock("@/components/WorkspaceNotifications", () => ({
   useWorkspaceNotifications: () => ({ add: mocks.toast }),
@@ -38,11 +52,18 @@ vi.mock("./ScooterEditor", () => ({
     onCreated,
     initialSnapshot,
     draftActions,
+    onSubmittingChange,
   }: ScooterEditorProps) => {
     const [text, setText] = useState(initialSnapshot?.values.notes ?? "");
     useEffect(() => () => mocks.unmount(importDraft?.id), [importDraft?.id]);
     return (
       <div>
+        <button onClick={() => onSubmittingChange?.(importDraft!.id, true)}>
+          Begin submission
+        </button>
+        <button onClick={() => onSubmittingChange?.(importDraft!.id, false)}>
+          End submission
+        </button>
         {draftActions && !draftActions.hasOtherDrafts ? (
           <button onClick={draftActions.onDiscard}>Cancel</button>
         ) : null}
@@ -123,13 +144,18 @@ function mount(header?: HTMLElement) {
         <PageHeaderActionsContext
           value={{ isMobile: Boolean(header), target: header ?? null }}
         >
-          <ScooterImportWorkspace scootersHref="/en/scooters" brands={[]} />
+          <PageHeaderNavigationContext value={mocks.registerNavigation}>
+            <ScooterImportWorkspace scootersHref="/en/scooters" brands={[]} />
+          </PageHeaderNavigationContext>
         </PageHeaderActionsContext>
       </NextIntlClientProvider>
     </StrictMode>,
   );
 }
 beforeEach(() => {
+  window.history.replaceState({}, "", "/en/scooters/new");
+  mocks.replace.mockReset();
+  mocks.registerNavigation.mockClear();
   sessionStorage.clear();
   mocks.fetch.mockReset();
   mocks.unmount.mockReset();
@@ -754,10 +780,13 @@ it("updates the draft state without a detection toast", async () => {
   expect(rail.style.maskImage).toBe(scrollFade.softMask);
   expect(
     screen.getByRole("navigation", { name: "Scooter drafts" }),
-  ).toHaveClass("w-max");
+  ).toHaveClass("w-max", "px-(--page-gutter)");
+  expect(rail.style.getPropertyValue("--scroll-fade-width")).toBe(
+    "var(--page-gutter)",
+  );
   expect(rail.closest('[data-slot="horizontal-scroll-area"]')).toHaveClass(
     "-mx-(--page-gutter)",
-    "md:mx-0",
+    "w-auto",
   );
 });
 
@@ -871,4 +900,49 @@ it("preserves autosaved progress across navigation away and a return visit witho
       ([path]) => path === v1.scooters.ROUTES.importDrafts.discard("one"),
     ),
   ).toBe(false);
+});
+
+it("keeps draft-backed exits immediate but blocks header and browser Back while submitting", async () => {
+  mocks.fetch.mockResolvedValue({ items: [draft("one")] });
+  mount();
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Begin submission" }),
+  );
+  expect(mocks.registerNavigation.mock.calls.at(-1)![0].backDisabled).toBe(
+    true,
+  );
+  act(() => mocks.registerNavigation.mock.calls.at(-1)![0].onBack!());
+  fireEvent.popState(window, { state: {} });
+  expect(mocks.replace).not.toHaveBeenCalled();
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(
+    window.dispatchEvent(new Event("beforeunload", { cancelable: true })),
+  ).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "End submission" }));
+  expect(mocks.registerNavigation.mock.calls.at(-1)![0].backDisabled).toBe(
+    false,
+  );
+  act(() => mocks.registerNavigation.mock.calls.at(-1)![0].onBack!());
+  expect(mocks.replace).toHaveBeenCalledWith("/en/scooters");
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+
+it("keeps Back blocked until every parallel draft submission finishes", async () => {
+  mocks.fetch.mockResolvedValue({ items: [draft("one"), draft("two")] });
+  mount();
+  await screen.findByRole("textbox", { name: "Draft note" });
+  const starts = screen.getAllByText("Begin submission");
+  const finishes = screen.getAllByText("End submission");
+  fireEvent.click(starts[0]!);
+  fireEvent.click(starts[1]!);
+  fireEvent.click(finishes[0]!);
+  expect(mocks.registerNavigation.mock.calls.at(-1)![0].backDisabled).toBe(
+    true,
+  );
+  act(() => mocks.registerNavigation.mock.calls.at(-1)![0].onBack!());
+  expect(mocks.replace).not.toHaveBeenCalled();
+  fireEvent.click(finishes[1]!);
+  expect(mocks.registerNavigation.mock.calls.at(-1)![0].backDisabled).toBe(
+    false,
+  );
 });

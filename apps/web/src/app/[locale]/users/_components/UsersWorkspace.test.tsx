@@ -311,6 +311,7 @@ describe("member access workspace", () => {
       name: "Customize permissions",
     });
     expect(sheet).toHaveClass("bg-popover");
+    expect(sheet).toHaveClass("lg:w-(--breakpoint-lg)");
     const tabBar = within(sheet).getByRole("tablist").parentElement;
     expect(tabBar).toHaveClass("sticky", "top-0", "bg-popover");
     expect(tabBar?.closest('[data-slot="bottom-sheet-body"]')).toHaveClass(

@@ -66,6 +66,52 @@ function review(
 }
 
 describe("saved document reextraction review", () => {
+  it("never asks to accept classification-only readings or changed extraction metadata", () => {
+    const previous: v1.scooters.ScooterDocumentExtractedData = {
+      vin,
+      fields: { color: "Black" },
+      rawFields: {},
+      documents: [
+        {
+          id: "civ-page",
+          documentType: "civ",
+          pages: [1],
+          vin,
+          fields: { color: "Black" },
+          rawFields: {},
+          issues: [],
+        },
+      ],
+    };
+    const classified = {
+      ...analysis({}),
+      sourceId: "card",
+      documentType: "itp_card" as const,
+      extractedData: {
+        vin: null,
+        fields: {},
+        rawFields: { title: "Yellow card" },
+      },
+    };
+    const result = review(
+      [
+        {
+          ...analysis({ color: "Black" }),
+          extractedData: {
+            ...previous,
+            documents: previous.documents!.map((document) => ({
+              ...document,
+              issues: [{ field: "color", code: "unreadable" }],
+            })),
+          },
+        },
+        classified,
+      ],
+      values({ color: "Black" }),
+      [file(previous), { ...file(), id: "card", type: "itp_card" }],
+    );
+    expect(result.proposals).toEqual([]);
+  });
   it("preserves 113 accumulated CIV labels when accepting a re-extracted issue date", () => {
     const previous = Object.fromEntries(
       Array.from({ length: 53 }, (_, i) => [`old-${i}`, `original ${i}`]),

@@ -258,7 +258,7 @@ function CommentComposer({
             id={id}
             rows={1}
             autoResize
-            className="min-h-10 max-h-36 resize-none overflow-y-auto px-3 py-2 text-base leading-6 md:min-h-10 md:py-2 md:text-sm"
+            className="min-h-11 max-h-36 resize-none overflow-y-auto px-3 py-2.5 text-base leading-6 md:min-h-11 md:py-2.5 md:text-sm"
             value={value}
             onChange={(event) => onValueChange(event.target.value)}
             placeholder={placeholder}

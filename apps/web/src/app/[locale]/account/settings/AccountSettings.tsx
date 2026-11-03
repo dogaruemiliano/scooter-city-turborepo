@@ -2,6 +2,8 @@
 
 import { PageLayout } from "@repo/ui/components/page-layout";
 import { AvatarSettings } from "./_components/AvatarSettings";
+import { NotificationSettings } from "./_components/NotificationSettings";
+import { canAccess } from "@/lib/access";
 import { useWorkspaceNotifications } from "@/components/WorkspaceNotifications";
 import { useFormAction } from "@/lib/form/use-form-action";
 import { SaveButton } from "@repo/ui/components/save-button";
@@ -70,6 +72,7 @@ export function AccountSettings({
   const formAction = useFormAction();
   const notifications = useWorkspaceNotifications();
   const notificationText = useTranslations("shared.notifications");
+  const notificationSettingsText = useTranslations("notifications");
 
   const router = useRouter();
   const pathname = usePathname();
@@ -310,6 +313,23 @@ export function AccountSettings({
         </form>
       </Card>
 
+      {canAccess(user, "notifications.receive") ? (
+        <Card
+          as="section"
+          id="notifications"
+          aria-labelledby="notification-settings-title"
+        >
+          <CardHeader>
+            <CardTitle id="notification-settings-title">
+              {notificationSettingsText("settings")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <NotificationSettings />
+          </CardContent>
+        </Card>
+      ) : null}
+
       <Card>
         <CardHeader>
           <CardTitle>Active sessions</CardTitle>
@@ -445,6 +465,7 @@ export function AccountSettings({
             description="Type DELETE to confirm. Your audit history may be retained without a user identifier."
             confirmLabel="Delete account"
             confirmText="DELETE"
+            showCancelButton={false}
             onConfirm={deleteAccount}
           />
         </CardFooter>
@@ -480,6 +501,7 @@ function ConfirmationDialog({
   description,
   confirmLabel,
   confirmText,
+  showCancelButton = true,
   disabled = false,
   onConfirm,
 }: {
@@ -489,6 +511,7 @@ function ConfirmationDialog({
   description: string;
   confirmLabel: string;
   confirmText?: string;
+  showCancelButton?: boolean;
   disabled?: boolean;
   onConfirm: () => Promise<boolean>;
 }) {
@@ -550,11 +573,15 @@ function ConfirmationDialog({
           </div>
         ) : null}
         <DialogFooter>
-          <DialogClose
-            render={<Button type="button" variant="outline" disabled={busy} />}
-          >
-            Cancel
-          </DialogClose>
+          {showCancelButton ? (
+            <DialogClose
+              render={
+                <Button type="button" variant="outline" disabled={busy} />
+              }
+            >
+              Cancel
+            </DialogClose>
+          ) : null}
           <SaveButton
             type="button"
             variant="destructive"

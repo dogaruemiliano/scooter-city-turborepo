@@ -71,9 +71,17 @@ describe("client copy generation", () => {
     });
     await waitFor(() => expect(uploads).toHaveLength(1));
     expect(hook.result.current.generatingClientCopies).toBe(true);
+    expect(hook.result.current.clientCopyProgress).toEqual({
+      done: 0,
+      total: 2,
+    });
     expect(completed).not.toHaveBeenCalled();
     await act(async () => uploads[0]!({ ok: true }));
     await waitFor(() => expect(uploads).toHaveLength(2));
+    expect(hook.result.current.clientCopyProgress).toEqual({
+      done: 1,
+      total: 2,
+    });
     expect(completed).not.toHaveBeenCalled();
     expect(hook.result.current.generatingClientCopies).toBe(true);
     await act(async () => {
@@ -81,6 +89,10 @@ describe("client copy generation", () => {
       await generating;
     });
     expect(completed).toHaveBeenCalledExactlyOnceWith(true);
+    expect(hook.result.current.clientCopyProgress).toEqual({
+      done: 2,
+      total: 2,
+    });
     expect(hook.result.current.drafts).toHaveLength(2);
     expect(
       hook.result.current.drafts.every((draft) => draft.status === "ready"),

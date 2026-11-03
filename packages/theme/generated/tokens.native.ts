@@ -388,6 +388,12 @@ export const tokens = {
   },
   motion: {
     gesture: {
+      pullToRefresh: {
+        axisLockDistance: 8,
+        threshold: 96,
+        maxTravel: 64,
+        resistance: 0.5,
+      },
       wizard: {
         axisLockDistance: 8,
         commitFraction: 0.25,

@@ -131,26 +131,29 @@ export function ScooterBatchDocuments({
   );
   const ghosts = editing
     ? required.flatMap((type) =>
-        [false, true]
-          .filter(
-            (clientCopy) =>
-              !displayed.some(
-                (entry) =>
-                  entry.type === type &&
-                  entry.clientCopy === clientCopy &&
-                  v1.scooters.scooterDocumentState(
-                    entry.document,
-                    undefined,
-                    type,
-                  ) === "current" &&
-                  (!type.startsWith("itp_") ||
-                    !v1.scooters.scooterItpDocumentsDue(
-                      v1.scooters.scooterDocumentValidity(entry.document, type)
-                        .validUntil,
-                    )),
-              ),
-          )
-          .map((clientCopy) => ({ type, clientCopy })),
+        [false, true].flatMap((clientCopy) => {
+          const matching = displayed.filter(
+            (entry) => entry.type === type && entry.clientCopy === clientCopy,
+          );
+          if (!matching.length) return [{ type, clientCopy, renewal: false }];
+          const needsRenewal = matching.every((entry) => {
+            const state = v1.scooters.scooterDocumentState(
+              entry.document,
+              undefined,
+              type,
+            );
+            return (
+              state === "expired" ||
+              (state === "current" &&
+                type.startsWith("itp_") &&
+                v1.scooters.scooterItpDocumentsDue(
+                  v1.scooters.scooterDocumentValidity(entry.document, type)
+                    .validUntil,
+                ))
+            );
+          });
+          return needsRenewal ? [{ type, clientCopy, renewal: true }] : [];
+        }),
       )
     : [];
   const rank = (type: string | null, clientCopy: boolean) => {
@@ -277,7 +280,7 @@ export function ScooterBatchDocuments({
             state={documents.generatingClientCopies ? "pending" : "idle"}
             disabled={disabled || analyzing}
             idleLabel={t("generateClientCopies")}
-            pendingLabel={t("generatingClientCopies")}
+            pendingLabel={t("clientCopyProgress", documents.clientCopyProgress)}
             successLabel={t("clientCopiesGenerated")}
             onClick={async () => {
               const generated = await documents.generateClientCopies();
@@ -380,7 +383,11 @@ export function ScooterBatchDocuments({
                                   : ""}
                               </span>
                               <span className="text-xs">
-                                {t("missingDocument")}
+                                {t(
+                                  entry.renewal
+                                    ? "renewDocument"
+                                    : "missingDocument",
+                                )}
                               </span>
                             </li>
                           );
@@ -388,6 +395,14 @@ export function ScooterBatchDocuments({
                         const badge = entry.badge ? (
                           <Badge variant="outline">
                             {t(`lifecycle.${entry.badge}`)}
+                          </Badge>
+                        ) : v1.scooters.scooterDocumentState(
+                            document,
+                            undefined,
+                            entry.type,
+                          ) === "unknown" ? (
+                          <Badge variant="warning">
+                            {t("lifecycle.review")}
                           </Badge>
                         ) : undefined;
                         if (document.kind === "saved")

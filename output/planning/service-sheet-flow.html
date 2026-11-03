@@ -1,0 +1,183 @@
+<div id="scooter-service-flow">
+  <h3>One scooter · one service sheet</h3>
+  <p class="text-small">Example: 3 Nov 2026 · 12,000 km · last oil change 10 Sep 2026 at 11,000 km</p>
+
+  <div class="viz-controls" role="group" aria-label="Explore an action">
+    <button type="button" class="btn" data-action="problem" aria-pressed="true">Add a problem</button>
+    <button type="button" class="btn" data-action="maintenance" aria-pressed="false">Plan an oil change</button>
+    <button type="button" class="btn" data-action="completed" aria-pressed="false">Record oil change done</button>
+  </div>
+
+  <div id="service-path" aria-live="polite" aria-atomic="true"></div>
+
+  <section id="service-timing" hidden aria-labelledby="service-timing-title">
+    <h3 id="service-timing-title">Next oil change</h3>
+    <p class="text-small" id="service-anchor"></p>
+    <div class="viz-controls" role="group" aria-label="Date target; select again to clear">
+      <span>Date</span>
+      <button type="button" class="btn" data-weeks="1" aria-pressed="false">In 1 week</button>
+      <button type="button" class="btn" data-weeks="2" aria-pressed="false">In 2 weeks</button>
+    </div>
+    <div class="viz-controls" role="group" aria-label="Mileage target; select again to clear">
+      <span>Mileage</span>
+      <button type="button" class="btn" data-km="1000" aria-pressed="false">In 1,000 km</button>
+      <button type="button" class="btn" data-km="1500" aria-pressed="false">In 1,500 km</button>
+    </div>
+    <p class="text-small">Date and/or mileage · select again to clear</p>
+    <p id="service-due" aria-live="polite" aria-atomic="true"></p>
+  </section>
+
+  <hr>
+  <h3>Result on the service sheet</h3>
+  <table class="table table-sm" aria-label="Effect of the selected action">
+    <tbody>
+      <tr><th scope="row">Work to do</th><td id="service-pending"></td></tr>
+      <tr><th scope="row">Last oil change</th><td id="service-last" class="tabular-nums"></td></tr>
+      <tr><th scope="row">History added</th><td id="service-history"></td></tr>
+    </tbody>
+  </table>
+</div>
+<script>
+(() => {
+  const root = document.getElementById('scooter-service-flow');
+  const baselineDate = '2026-11-03';
+  const baselineKm = 12000;
+  const state = { action: 'problem', weeks: null, km: null };
+  const byId = (id) => root.querySelector('#' + id);
+  const formatKm = (km) => new Intl.NumberFormat('en-GB').format(km);
+  const formatDate = (iso) => new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC'
+  }).format(new Date(iso + 'T12:00:00Z'));
+
+  function dueDate() {
+    if (state.weeks === null) return null;
+    const date = new Date(baselineDate + 'T12:00:00Z');
+    date.setUTCDate(date.getUTCDate() + state.weeks * 7);
+    return date.toISOString().slice(0, 10);
+  }
+
+  function dueLabel() {
+    const date = dueDate();
+    const targetKm = state.km === null ? null : baselineKm + state.km;
+    if (date && targetKm !== null) {
+      return formatDate(date) + ' or ' + formatKm(targetKm) + ' km — whichever comes first';
+    }
+    if (date) return formatDate(date);
+    if (targetKm !== null) return formatKm(targetKm) + ' km';
+    return 'Timing not set';
+  }
+
+  function pathSteps() {
+    if (state.action === 'problem') return [
+      ['Report a symptom', '“Vibration when accelerating”'],
+      ['Work to inspect', 'Visible on this scooter’s service sheet'],
+      ['During a service visit', 'Diagnose → fix, check, or defer'],
+      ['After the visit', 'Record findings; unresolved work stays open']
+    ];
+    if (state.action === 'maintenance') return [
+      ['Plan known work', '“Change engine oil”'],
+      ['Choose when it is due', 'Date, mileage, both, or leave timing unset'],
+      ['Work to do', 'Visible before and during the service visit'],
+      ['When actually performed', 'Record completion → history → next oil change']
+    ];
+    return [
+      ['Confirm work performed', 'Oil changed on 3 Nov 2026 at 12,000 km'],
+      ['Add to service history', 'Update the last oil change; finish this oil-change item'],
+      ['Choose the next target', 'Quick actions use the date and mileage of this change'],
+      ['Create the next oil-change item', 'Upcoming now; due when its target is reached']
+    ];
+  }
+
+  function render() {
+    root.querySelectorAll('[data-action]').forEach((button) => {
+      button.setAttribute('aria-pressed', String(button.dataset.action === state.action));
+    });
+    root.querySelectorAll('[data-weeks]').forEach((button) => {
+      button.setAttribute('aria-pressed', String(Number(button.dataset.weeks) === state.weeks));
+    });
+    root.querySelectorAll('[data-km]').forEach((button) => {
+      button.setAttribute('aria-pressed', String(Number(button.dataset.km) === state.km));
+    });
+
+    const list = document.createElement('ol');
+    pathSteps().forEach(([label, detail]) => {
+      const item = document.createElement('li');
+      const title = document.createElement('strong');
+      const description = document.createElement('p');
+      title.textContent = label;
+      description.className = 'text-small';
+      description.textContent = detail;
+      item.append(title, description);
+      list.append(item);
+    });
+    byId('service-path').replaceChildren(list);
+
+    const isProblem = state.action === 'problem';
+    const isCompleted = state.action === 'completed';
+    byId('service-timing').hidden = isProblem;
+    byId('service-timing-title').textContent = isCompleted ? 'Next oil change' : 'When is this oil change due?';
+    byId('service-anchor').textContent = isCompleted
+      ? 'From the recorded change: 3 Nov 2026 · 12,000 km'
+      : 'From today’s known reading: 3 Nov 2026 · 12,000 km';
+    const label = dueLabel();
+    byId('service-due').textContent = 'Due: ' + label;
+    byId('service-pending').textContent = isProblem
+      ? 'Inspect vibration when accelerating'
+      : (isCompleted ? 'Next oil change · ' : 'Oil change · ') + label;
+    byId('service-last').textContent = isCompleted
+      ? '3 Nov 2026 · 12,000 km'
+      : '10 Sep 2026 · 11,000 km';
+    byId('service-history').textContent = isCompleted
+      ? 'Oil change performed · 3 Nov 2026 · 12,000 km'
+      : 'None — this action only adds planned work';
+  }
+
+  function restore(saved) {
+    const value = saved && saved.privateContent;
+    if (!value || value.version !== 1) return;
+    if (['problem', 'maintenance', 'completed'].includes(value.action)) state.action = value.action;
+    state.weeks = [1, 2].includes(value.weeks) ? value.weeks : null;
+    state.km = [1000, 1500].includes(value.km) ? value.km : null;
+  }
+
+  function remember() {
+    if (!window.openai || !window.openai.setWidgetState) return;
+    window.openai.setWidgetState({
+      modelContent: { exampleAction: state.action, nextOilDate: dueDate(), nextOilMileageKm: state.km === null ? null : baselineKm + state.km, dueWhen: 'whichever target is reached first' },
+      privateContent: { version: 1, ...state }
+    }).catch(() => {});
+  }
+
+  root.querySelectorAll('[data-action]').forEach((button) => {
+    button.addEventListener('click', () => {
+      state.action = button.dataset.action;
+      render();
+      remember();
+    });
+  });
+  root.querySelectorAll('[data-weeks]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const value = Number(button.dataset.weeks);
+      state.weeks = state.weeks === value ? null : value;
+      render();
+      remember();
+    });
+  });
+  root.querySelectorAll('[data-km]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const value = Number(button.dataset.km);
+      state.km = state.km === value ? null : value;
+      render();
+      remember();
+    });
+  });
+  restore(window.openai && window.openai.widgetState);
+  window.addEventListener('openai:set_globals', (event) => {
+    if (event.detail && event.detail.globals && event.detail.globals.widgetState) {
+      restore(event.detail.globals.widgetState);
+      render();
+    }
+  });
+  render();
+})();
+</script>

@@ -9,9 +9,13 @@ import {
   type DocumentAnalysisAttempt,
 } from "./scooter-document-analysis-job";
 import type { ScooterDocumentsEditor } from "./useScooterDocuments";
+import { canReextractScooterDocument } from "./scooter-document-reextraction";
 
 export type ReextractionEntry =
-  | { status: "processing" }
+  | {
+      status: "processing";
+      phase?: v1.scooters.ScooterDocumentExtractionJob["status"];
+    }
   | { status: "success"; analysis: v1.scooters.ScooterDocumentAnalysis }
   | { status: "failed"; error: string };
 
@@ -53,7 +57,7 @@ export function useScooterDocumentReextraction(
     if (active.current) return;
     const files = latest.current.existing.filter(
       (document) =>
-        !document.extractedData?.clientCopy &&
+        canReextractScooterDocument(document) &&
         (!onlyIds || onlyIds.includes(document.id)),
     );
     if (!files.length) return;
@@ -66,7 +70,10 @@ export function useScooterDocumentReextraction(
     setEntries((previous) => ({
       ...(onlyIds ? previous : {}),
       ...Object.fromEntries(
-        files.map((file) => [file.id, { status: "processing" as const }]),
+        files.map((file) => [
+          file.id,
+          { status: "processing" as const, phase: "queued" as const },
+        ]),
       ),
     }));
     const current = () =>
@@ -90,7 +97,13 @@ export function useScooterDocumentReextraction(
             attempt,
             file.type,
             operation.controller.signal,
-            () => {},
+            (phase) => {
+              if (current())
+                setEntries((previous) => ({
+                  ...previous,
+                  [file.id]: { status: "processing", phase },
+                }));
+            },
           );
           if (analysis.sourceId !== file.id)
             throw new Error("Unexpected source");

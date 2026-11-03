@@ -20,12 +20,14 @@ type Story = StoryObj<typeof meta>;
 export const StatusLanes: Story = {
   args: {
     label: "Repair status lanes",
+    fadeEdges: true,
+    scrollLeftLabel: "Scroll repairs left",
     scrollRightLabel: "Scroll repairs right",
   },
   render: (args) => (
     <div className="w-full max-w-lg">
       <HorizontalScrollArea {...args}>
-        <div className="flex gap-6">
+        <div className="flex w-max min-w-full gap-6 px-6">
           {["Open", "In progress", "Resolved", "Dismissed"].map((status) => (
             <Card key={status} className="w-72 shrink-0">
               <CardHeader>
@@ -39,8 +41,24 @@ export const StatusLanes: Story = {
   ),
 };
 
+/** Scroll right to reveal the return arrow; either edge also supports mouse-hover scrolling. */
+export const BidirectionalStatusLanes: Story = {
+  ...StatusLanes,
+  args: { ...StatusLanes.args, fadeEdges: true },
+};
+
+/** Boards can retain arrow navigation without a visible scrollbar or its spacing. */
+export const StatusLanesWithoutScrollbar: Story = {
+  ...StatusLanes,
+  args: { ...StatusLanes.args, scrollbarVisibility: "hidden" },
+};
+
 export const FadedDraftRail: Story = {
-  args: { label: "Scooter drafts", fadeEdges: true },
+  args: {
+    label: "Scooter drafts",
+    fadeEdges: true,
+    fadeWidth: "var(--spacing-2)",
+  },
   render: (args) => (
     <div className="w-full max-w-sm">
       <HorizontalScrollArea {...args}>
@@ -82,7 +100,7 @@ export const SnappingDocumentCards: Story = {
     <div className="w-full max-w-sm">
       <HorizontalScrollArea {...args}>
         <ul
-          className="grid w-full grid-flow-col gap-3"
+          className="grid w-full grid-flow-col gap-3 px-3"
           style={{ gridAutoColumns: viewportSizing.scooterDocumentCard }}
         >
           {["CIV", "Insurance", "Registration"].map((title) => (
