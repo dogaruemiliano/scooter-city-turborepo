@@ -264,7 +264,23 @@ describe("AccountSettings", () => {
 
     renderSettings();
     await browser.click(screen.getByRole("button", { name: "Delete account" }));
+    const initialDialog = await screen.findByRole("dialog");
+    expect(
+      within(initialDialog).queryByRole("button", { name: "Cancel" }),
+    ).not.toBeInTheDocument();
+    await browser.type(
+      within(initialDialog).getByLabelText("Confirmation"),
+      "DELETE",
+    );
+    await browser.click(
+      within(initialDialog).getByRole("button", { name: "Close" }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    await browser.click(screen.getByRole("button", { name: "Delete account" }));
     const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByLabelText("Confirmation")).toHaveValue("");
     const deleteButton = within(dialog).getByRole("button", {
       name: "Delete account",
     });

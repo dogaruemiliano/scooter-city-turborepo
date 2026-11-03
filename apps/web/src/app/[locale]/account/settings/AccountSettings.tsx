@@ -445,6 +445,7 @@ export function AccountSettings({
             description="Type DELETE to confirm. Your audit history may be retained without a user identifier."
             confirmLabel="Delete account"
             confirmText="DELETE"
+            showCancelButton={false}
             onConfirm={deleteAccount}
           />
         </CardFooter>
@@ -480,6 +481,7 @@ function ConfirmationDialog({
   description,
   confirmLabel,
   confirmText,
+  showCancelButton = true,
   disabled = false,
   onConfirm,
 }: {
@@ -489,6 +491,7 @@ function ConfirmationDialog({
   description: string;
   confirmLabel: string;
   confirmText?: string;
+  showCancelButton?: boolean;
   disabled?: boolean;
   onConfirm: () => Promise<boolean>;
 }) {
@@ -550,11 +553,15 @@ function ConfirmationDialog({
           </div>
         ) : null}
         <DialogFooter>
-          <DialogClose
-            render={<Button type="button" variant="outline" disabled={busy} />}
-          >
-            Cancel
-          </DialogClose>
+          {showCancelButton ? (
+            <DialogClose
+              render={
+                <Button type="button" variant="outline" disabled={busy} />
+              }
+            >
+              Cancel
+            </DialogClose>
+          ) : null}
           <SaveButton
             type="button"
             variant="destructive"
