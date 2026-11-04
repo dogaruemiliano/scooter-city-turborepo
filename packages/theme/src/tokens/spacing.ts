@@ -39,10 +39,8 @@ const spacingScale = {
 export const spacing = {
   ...spacingScale,
   screenBottom: spacingScale[2],
-  /** Ignore browser chrome and hardware-keyboard accessory bars when docking. */
-  keyboardDockThreshold: spacingScale[32],
-  /** iOS 26's floating form toolbar overlaps the visual viewport. */
-  iosKeyboardAccessoryClearance: spacingScale[12],
+  /** Distinguish a software keyboard from browser chrome or an accessory bar. */
+  keyboardOpenThreshold: spacingScale[32],
 } as const;
 
 export type Spacing = typeof spacing;

@@ -24,6 +24,7 @@ import { useWorkspaceNotifications } from "@/components/WorkspaceNotifications";
 import { canAccess } from "@/lib/access";
 import { webApi } from "@/lib/api";
 import { useFormAction } from "@/lib/form/use-form-action";
+import { cn } from "@repo/ui/lib/utils";
 
 /** The same request, validation and feedback for detail and list completion. */
 export function ProblemCompletion({
@@ -196,7 +197,11 @@ export function ProblemCompletion({
     <>
       {controlledOpen === undefined ? (
         <Button
-          className="sticky bottom-4 z-sticky order-last w-full shadow-primary"
+          className={cn(
+            "sticky bottom-4 z-sticky order-last w-full shadow-primary group-data-[keyboard-open=true]/keyboard-aware:static",
+            open && "invisible",
+          )}
+          aria-hidden={open || undefined}
           disabled={disabled || task.busy}
           onClick={() => setOpen(true)}
         >

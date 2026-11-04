@@ -92,7 +92,7 @@ function FormActions({
         data-sticky={floating}
         aria-busy={pending || undefined}
         className={cn(
-          "@container/form-actions sticky bottom-[max(var(--spacing-4),env(safe-area-inset-bottom))] z-sticky gap-0 py-0 shadow-md",
+          "@container/form-actions sticky bottom-[max(var(--spacing-4),env(safe-area-inset-bottom))] z-sticky gap-0 py-0 shadow-md group-data-[keyboard-open=true]/keyboard-aware:static",
           ready !== undefined && "w-full",
           ready !== undefined &&
             (floating

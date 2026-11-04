@@ -28,16 +28,18 @@ type Story = StoryObj<typeof meta>;
 
 const initialComments = [
   {
-    author: "Alex Morgan",
-    dateTime: "2026-10-24T09:15:00Z",
-    timestamp: "Today, 12:15",
-    body: "The rear brake pads are worn. I’ve ordered a replacement set and will check the brake fluid before fitting them.",
-  },
-  {
+    id: "initial-maria",
     author: "Maria Popescu",
     dateTime: "2026-10-24T10:40:00Z",
     timestamp: "Today, 13:40",
     body: "Parts arrived at the workshop.\nPlease leave the old pads with the inspection notes.",
+  },
+  {
+    id: "initial-alex",
+    author: "Alex Morgan",
+    dateTime: "2026-10-24T09:15:00Z",
+    timestamp: "Today, 12:15",
+    body: "The rear brake pads are worn. I’ve ordered a replacement set and will check the brake fluid before fitting them.",
   },
 ];
 const labels = {
@@ -67,7 +69,9 @@ function Conversation({
   expanded?: boolean;
   initialDraft?: string;
 }) {
-  const [newCommentIndex, setNewCommentIndex] = useState<number | null>(null);
+  const [newComment, setNewComment] = useState<
+    (typeof initialComments)[number] | null
+  >(null);
   const [recovered, setRecovered] = useState(false);
   const [comments, setComments] = useState(empty ? [] : initialComments);
   const [draft, setDraft] = useState(
@@ -81,7 +85,6 @@ function Conversation({
   return (
     <CommentThread
       title="Comments"
-      empty="No comments yet. Add the first update below."
       composer={
         readOnly ? undefined : (
           <CommentComposer
@@ -106,16 +109,15 @@ function Conversation({
             submitButton={{ ...labels, state }}
             onSubmit={(event) => {
               event.preventDefault();
-              setNewCommentIndex(comments.length);
-              setComments((current) => [
-                ...current,
-                {
-                  author: "Alex Morgan",
-                  dateTime: "2026-10-24T11:00:00Z",
-                  timestamp: "Just now",
-                  body: draft.trim(),
-                },
-              ]);
+              const added = {
+                id: `posted-${comments.length}`,
+                author: "Alex Morgan",
+                dateTime: "2026-10-24T11:00:00Z",
+                timestamp: "Just now",
+                body: draft.trim(),
+              };
+              setNewComment(added);
+              setComments((current) => [added, ...current]);
               setDraft("");
             }}
           />
@@ -124,11 +126,15 @@ function Conversation({
     >
       {comments.length ? (
         <ol className="flex flex-col gap-6">
-          {comments.map((comment, index) => (
+          {comments.map((comment) => (
             <CommentItem
-              key={index}
-              animateEntrance={index === newCommentIndex}
-              onAnimationEnd={() => setNewCommentIndex(null)}
+              key={comment.id}
+              animateEntrance={comment === newComment}
+              onAnimationEnd={() =>
+                setNewComment((current) =>
+                  current === comment ? null : current,
+                )
+              }
               author={
                 long ? "Alexandru Constantin Popescu Ionescu" : comment.author
               }
@@ -182,7 +188,7 @@ export const Mobile: Story = {
     docs: {
       description: {
         story:
-          "On a phone, focus the composer to dock it above the software keyboard. iOS 26 gets clearance for its floating form toolbar; Android and older iOS stay at the reported keyboard edge. Dismissing the keyboard restores the composer to the thread. Desktop browser previews do not render native keyboard chrome.",
+          "The input stays below the section title and above the newest-first comments. The page's KeyboardAwareScrollView keeps a focused input visible when the software keyboard opens, with unchanged content spacing. The composer never adds padding, detaches from the thread, or scrolls the document. Native keyboard behavior requires a mobile browser or Simulator.",
       },
     },
   },

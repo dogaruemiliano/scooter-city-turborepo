@@ -1,9 +1,10 @@
 "use client";
 
 import { useRef, useState, type ReactNode } from "react";
-import { motion } from "@repo/theme";
+import { motion, spacing } from "@repo/theme";
+import { cn } from "@repo/ui/lib/utils";
 
-/** Leftward touch/pen gesture. The caller supplies a visible keyboard alternative. */
+/** Leftward touch/pen gesture. Keep the action available through the child's keyboard-accessible detail flow. */
 export function SwipeAction({
   children,
   action,
@@ -21,9 +22,19 @@ export function SwipeAction({
     y: number;
     axis: "x" | "y" | null;
     offset: number;
+    startOffset: number;
   } | null>(null);
+  const content = useRef<HTMLDivElement>(null);
   const suppressClick = useRef(false);
-  const [offset, setOffset] = useState(0);
+  const [{ offset, dragging }, setPosition] = useState({
+    offset: 0,
+    dragging: false,
+  });
+  const revealWidth = Math.max(0, -offset - spacing[2]);
+  const settle = () => {
+    gesture.current = null;
+    setPosition({ offset: 0, dragging: false });
+  };
   return (
     <div
       data-slot="swipe-action"
@@ -47,13 +58,25 @@ export function SwipeAction({
           )
         )
           return;
+        // Preserve the current visual position if a new swipe interrupts the return.
+        const startOffset = Math.max(
+          -motion.gesture.swipeAction.maxTravel,
+          Math.min(
+            0,
+            (content.current?.getBoundingClientRect().left ??
+              event.currentTarget.getBoundingClientRect().left) -
+              event.currentTarget.getBoundingClientRect().left,
+          ),
+        );
         gesture.current = {
           id: event.pointerId,
           x: event.clientX,
           y: event.clientY,
           axis: null,
-          offset: 0,
+          offset: startOffset,
+          startOffset,
         };
+        setPosition({ offset: startOffset, dragging: true });
       }}
       onPointerMove={(event) => {
         const drag = gesture.current;
@@ -64,22 +87,25 @@ export function SwipeAction({
           !drag.axis &&
           Math.max(Math.abs(dx), Math.abs(dy)) >=
             motion.gesture.swipeAction.axisLockDistance
-        )
+        ) {
           drag.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+          if (drag.axis === "x")
+            event.currentTarget.setPointerCapture?.(event.pointerId);
+          else setPosition({ offset: 0, dragging: false });
+        }
         if (drag.axis !== "x") return;
         event.preventDefault();
         suppressClick.current = true;
-        event.currentTarget.setPointerCapture?.(event.pointerId);
         drag.offset = Math.max(
           -motion.gesture.swipeAction.maxTravel,
-          Math.min(0, dx),
+          Math.min(0, drag.startOffset + dx),
         );
-        setOffset(drag.offset);
+        setPosition({ offset: drag.offset, dragging: true });
       }}
       onPointerUp={(event) => {
         const drag = gesture.current;
-        gesture.current = null;
-        setOffset(0);
+        if (!drag || drag.id !== event.pointerId) return;
+        settle();
         if (
           !disabled &&
           drag?.id === event.pointerId &&
@@ -88,20 +114,42 @@ export function SwipeAction({
         )
           onAction();
       }}
-      onPointerCancel={() => {
-        gesture.current = null;
-        setOffset(0);
+      onPointerCancel={(event) => {
+        if (gesture.current?.id === event.pointerId) settle();
+      }}
+      onLostPointerCapture={(event) => {
+        // Ignore capture transferred from a nested link to this wrapper.
+        if (
+          event.target === event.currentTarget &&
+          gesture.current?.id === event.pointerId
+        )
+          settle();
       }}
     >
       <div
         aria-hidden="true"
-        className="absolute inset-y-0 right-0 flex w-24 items-center justify-center bg-success-subtle text-success"
+        data-slot="swipe-action-surface"
+        className={cn(
+          "pointer-events-none absolute inset-y-0 right-0 flex items-center justify-center overflow-hidden rounded-2xl bg-success-subtle text-success",
+          !dragging &&
+            "transition-[width] duration-fast ease-decelerate motion-reduce:transition-none",
+        )}
+        style={{ width: revealWidth }}
       >
-        {action}
+        <span className="flex shrink-0 items-center justify-center">
+          {action}
+        </span>
       </div>
       <div
-        className="relative transition-transform duration-fast motion-reduce:transition-none"
-        style={{ transform: offset ? `translateX(${offset}px)` : undefined }}
+        ref={content}
+        data-slot="swipe-action-content"
+        data-dragging={dragging || undefined}
+        className={cn(
+          "relative",
+          !dragging &&
+            "transition-transform duration-fast ease-decelerate motion-reduce:transition-none",
+        )}
+        style={{ transform: `translate3d(${offset}px, 0, 0)` }}
       >
         {children}
       </div>

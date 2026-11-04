@@ -503,9 +503,6 @@ export function ProblemsWorkspace({ todo = false }: { todo?: boolean }) {
               const card = (
                 <ProblemListItem
                   problem={problem}
-                  onComplete={
-                    mayComplete ? () => setCompleting(problem) : undefined
-                  }
                   href={localizePath(
                     `${todo ? "/todos" : "/problems"}/${encodeURIComponent(problem.id)}`,
                     locale,

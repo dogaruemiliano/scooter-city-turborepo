@@ -458,7 +458,6 @@ export const workspaceCatalog = {
       reminderCooldownLabel: "Reminder to {name} is on cooldown",
       completionUnavailable:
         "This task can no longer be completed. Reload its details.",
-      completeTaskFor: "Complete task: {title}",
       sendReminder: "Send reminder to {name}",
       sendingReminder: "Sending reminder to {name}…",
       reminderSent: "Reminder sent.",
@@ -1071,7 +1070,6 @@ export const workspaceCatalog = {
         "Memento-ul către {name} este în perioada de așteptare",
       completionUnavailable:
         "Această sarcină nu mai poate fi finalizată. Reîncarcă detaliile ei.",
-      completeTaskFor: "Finalizează sarcina: {title}",
       sendReminder: "Trimite un memento către {name}",
       sendingReminder: "Se trimite un memento către {name}…",
       reminderSent: "Memento trimis.",

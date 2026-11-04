@@ -465,8 +465,7 @@
   --spacing-1-5: 0.375rem;
   --spacing-2-5: 0.625rem;
   --spacing-screen-bottom: 0.5rem;
-  --spacing-keyboard-dock-threshold: 8rem;
-  --spacing-ios-keyboard-accessory-clearance: 3rem;
+  --spacing-keyboard-open-threshold: 8rem;
   --container-dropdown-menu-xs: 90vw;
   --container-dropdown-menu-sm: 80vw;
   --container-dropdown-menu-max: 384px;

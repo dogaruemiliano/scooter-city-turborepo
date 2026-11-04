@@ -38,6 +38,7 @@ it("reveals valid actions, keeps the same controls during submission, and return
     "slide-in-from-bottom-4",
     "duration-normal",
     "motion-reduce:animate-none",
+    "group-data-[keyboard-open=true]/keyboard-aware:static",
   );
   expect(submit).not.toBeDisabled();
   submit.focus();
