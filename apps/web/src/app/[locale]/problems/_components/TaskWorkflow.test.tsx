@@ -256,41 +256,51 @@ describe("admin and worker completion", () => {
       },
     );
   });
-  it("opens completion only by swiping the list card, retaining the detail link", async () => {
-    mocks.fetch.mockResolvedValue({
-      items: [problem],
-      total: 1,
-      page: 1,
-      pageSize: 25,
-      quickFilterCounts: {
-        all: 1,
-        open: 1,
-        in_progress: 0,
-        mine: 0,
-        resolved: 0,
-      },
-    });
-    wrapper(<ProblemsWorkspace todo />);
-    const link = await screen.findByRole("link", { name: "Order supplies" });
-    expect(link).toHaveAttribute("href", "/en/todos/task");
-    expect(screen.queryByRole("button", { name: /Complete task/ })).toBeNull();
-    expect(screen.queryByRole("dialog")).toBeNull();
-    vi.stubGlobal("PointerEvent", TestPointerEvent);
-    const card = link.closest('[data-slot="swipe-action"]')!;
-    fireEvent.pointerDown(link, { clientX: 200, clientY: 100, pointerId: 1 });
-    fireEvent.pointerMove(card, {
-      clientX: 200 - motion.gesture.swipeAction.threshold,
-      clientY: 100,
-      pointerId: 1,
-    });
-    fireEvent.pointerUp(card, { pointerId: 1 });
-    expect(screen.getByRole("dialog", { name: "Complete task" })).toBeVisible();
-    expect(
-      mocks.fetch.mock.calls.filter(
-        ([, , options]) => options?.method === "POST",
-      ),
-    ).toHaveLength(0);
-  });
+  it.each([true, false])(
+    "opens completion only by swiping the list card, retaining the detail link (todo: %s)",
+    async (todo) => {
+      mocks.fetch.mockResolvedValue({
+        items: [problem],
+        total: 1,
+        page: 1,
+        pageSize: 25,
+        quickFilterCounts: {
+          all: 1,
+          open: 1,
+          in_progress: 0,
+          mine: 0,
+          resolved: 0,
+        },
+      });
+      wrapper(<ProblemsWorkspace todo={todo} />);
+      const link = await screen.findByRole("link", { name: "Order supplies" });
+      expect(link).toHaveAttribute(
+        "href",
+        `/en/${todo ? "todos" : "problems"}/task`,
+      );
+      expect(
+        screen.queryByRole("button", { name: /Complete task/ }),
+      ).toBeNull();
+      expect(screen.queryByRole("dialog")).toBeNull();
+      vi.stubGlobal("PointerEvent", TestPointerEvent);
+      const card = link.closest('[data-slot="swipe-action"]')!;
+      fireEvent.pointerDown(link, { clientX: 200, clientY: 100, pointerId: 1 });
+      fireEvent.pointerMove(card, {
+        clientX: 200 - motion.gesture.swipeAction.threshold,
+        clientY: 100,
+        pointerId: 1,
+      });
+      fireEvent.pointerUp(card, { pointerId: 1 });
+      expect(
+        screen.getByRole("dialog", { name: "Complete task" }),
+      ).toBeVisible();
+      expect(
+        mocks.fetch.mock.calls.filter(
+          ([, , options]) => options?.method === "POST",
+        ),
+      ).toHaveLength(0);
+    },
+  );
 });
 
 describe("reminder bell", () => {
@@ -429,6 +439,10 @@ describe("shared swipe action", () => {
       '[data-slot="swipe-action-surface"]',
     )!;
     const capture = vi.fn();
+    expect(item).toHaveClass("overflow-visible");
+    expect(item).not.toHaveClass("overflow-hidden");
+    expect(item).not.toHaveClass("overflow-clip");
+    expect(surface).toHaveClass("overflow-hidden");
     Object.defineProperty(item, "setPointerCapture", { value: capture });
     fireEvent.pointerDown(screen.getByRole("link"), {
       pointerId: 1,

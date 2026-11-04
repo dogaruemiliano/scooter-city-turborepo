@@ -38,7 +38,8 @@ export function SwipeAction({
   return (
     <div
       data-slot="swipe-action"
-      className="relative isolate overflow-hidden rounded-xl"
+      // The card can leave its resting bounds; only the action surface clips.
+      className="relative isolate overflow-visible rounded-xl"
       style={{ touchAction: "pan-y pinch-zoom" }}
       onClickCapture={(event) => {
         if (suppressClick.current) {
