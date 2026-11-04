@@ -11,7 +11,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { messages } from "@repo/i18n";
 import { ApiError, v1 } from "@repo/api-shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { motion } from "@repo/theme";
+import { motion, spacing } from "@repo/theme";
 import { ProblemCompletion } from "./ProblemCompletion";
 import { ProblemAssignment } from "./ProblemAssignment";
 import { ProblemsWorkspace } from "./ProblemsWorkspace";
@@ -70,6 +70,17 @@ function wrapper(children: React.ReactNode, locale: "en" | "ro" = "en") {
       {children}
     </NextIntlClientProvider>,
   );
+}
+class TestPointerEvent extends MouseEvent {
+  pointerId: number;
+  pointerType: string;
+  isPrimary: boolean;
+  constructor(type: string, init: PointerEventInit = {}) {
+    super(type, init);
+    this.pointerId = init.pointerId ?? 1;
+    this.pointerType = init.pointerType ?? "touch";
+    this.isPrimary = init.isPrimary ?? true;
+  }
 }
 beforeEach(() => {
   mocks.fetch.mockReset();
@@ -245,7 +256,7 @@ describe("admin and worker completion", () => {
       },
     );
   });
-  it("opens the same sheet using the list's keyboard-accessible action", async () => {
+  it("opens completion only by swiping the list card, retaining the detail link", async () => {
     mocks.fetch.mockResolvedValue({
       items: [problem],
       total: 1,
@@ -260,11 +271,19 @@ describe("admin and worker completion", () => {
       },
     });
     wrapper(<ProblemsWorkspace todo />);
-    const action = await screen.findByRole("button", {
-      name: "Complete task: Order supplies",
-    });
+    const link = await screen.findByRole("link", { name: "Order supplies" });
+    expect(link).toHaveAttribute("href", "/en/todos/task");
+    expect(screen.queryByRole("button", { name: /Complete task/ })).toBeNull();
     expect(screen.queryByRole("dialog")).toBeNull();
-    await userEvent.setup().click(action);
+    vi.stubGlobal("PointerEvent", TestPointerEvent);
+    const card = link.closest('[data-slot="swipe-action"]')!;
+    fireEvent.pointerDown(link, { clientX: 200, clientY: 100, pointerId: 1 });
+    fireEvent.pointerMove(card, {
+      clientX: 200 - motion.gesture.swipeAction.threshold,
+      clientY: 100,
+      pointerId: 1,
+    });
+    fireEvent.pointerUp(card, { pointerId: 1 });
     expect(screen.getByRole("dialog", { name: "Complete task" })).toBeVisible();
     expect(
       mocks.fetch.mock.calls.filter(
@@ -367,17 +386,6 @@ describe("reminder bell", () => {
 });
 
 describe("shared swipe action", () => {
-  class TestPointerEvent extends MouseEvent {
-    pointerId: number;
-    pointerType: string;
-    isPrimary: boolean;
-    constructor(type: string, init: PointerEventInit = {}) {
-      super(type, init);
-      this.pointerId = init.pointerId ?? 1;
-      this.pointerType = init.pointerType ?? "touch";
-      this.isPrimary = init.isPrimary ?? true;
-    }
-  }
   function gesture(dx: number, dy: number, cancel = false) {
     const item = document.querySelector('[data-slot="swipe-action"]')!;
     fireEvent.pointerDown(item, { clientX: 200, clientY: 100, pointerId: 1 });
@@ -404,6 +412,71 @@ describe("shared swipe action", () => {
     expect(action).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("link"));
     expect(navigate).not.toHaveBeenCalled();
+  });
+  it("tracks a slow swipe directly, captures once and rounds the whole revealed surface", () => {
+    vi.stubGlobal("PointerEvent", TestPointerEvent);
+    const action = vi.fn();
+    const { container } = wrapper(
+      <SwipeAction action="Complete" onAction={action}>
+        <a href="https://example.test/task">Task</a>
+      </SwipeAction>,
+    );
+    const item = container.querySelector('[data-slot="swipe-action"]')!;
+    const content = container.querySelector(
+      '[data-slot="swipe-action-content"]',
+    )!;
+    const surface = container.querySelector(
+      '[data-slot="swipe-action-surface"]',
+    )!;
+    const capture = vi.fn();
+    Object.defineProperty(item, "setPointerCapture", { value: capture });
+    fireEvent.pointerDown(screen.getByRole("link"), {
+      pointerId: 1,
+      clientX: 200,
+      clientY: 100,
+    });
+    for (const dx of [-10, -20, -35, -50]) {
+      fireEvent.pointerMove(item, {
+        pointerId: 1,
+        clientX: 200 + dx,
+        clientY: 100,
+      });
+      expect(content).toHaveStyle({ transform: `translate3d(${dx}px, 0, 0)` });
+      expect(content).not.toHaveClass("transition-transform");
+      expect(surface).toHaveStyle({ width: `${-dx - spacing[2]}px` });
+      expect(surface).not.toHaveClass("transition-[width]");
+    }
+    expect(capture).toHaveBeenCalledTimes(1);
+    expect(surface).toHaveClass("rounded-2xl");
+    // Native implicit capture moves from the link to the wrapper at axis lock.
+    fireEvent.lostPointerCapture(screen.getByRole("link"), { pointerId: 1 });
+    expect(content).toHaveStyle({ transform: "translate3d(-50px, 0, 0)" });
+    fireEvent.pointerUp(item, { pointerId: 1 });
+    expect(content).toHaveStyle({ transform: "translate3d(0px, 0, 0)" });
+    expect(content).toHaveClass("transition-transform");
+    expect(action).not.toHaveBeenCalled();
+  });
+  it("continues from the visible position when a swipe interrupts the return", () => {
+    vi.stubGlobal("PointerEvent", TestPointerEvent);
+    const { container } = wrapper(
+      <SwipeAction action="Complete" onAction={vi.fn()}>
+        <span>Task</span>
+      </SwipeAction>,
+    );
+    const item = container.querySelector('[data-slot="swipe-action"]')!;
+    const content = container.querySelector(
+      '[data-slot="swipe-action-content"]',
+    )!;
+    vi.spyOn(item, "getBoundingClientRect").mockReturnValue({
+      left: 100,
+    } as DOMRect);
+    vi.spyOn(content, "getBoundingClientRect").mockReturnValue({
+      left: 70,
+    } as DOMRect);
+    fireEvent.pointerDown(item, { pointerId: 1, clientX: 200, clientY: 100 });
+    expect(content).toHaveStyle({ transform: "translate3d(-30px, 0, 0)" });
+    fireEvent.pointerMove(item, { pointerId: 1, clientX: 190, clientY: 100 });
+    expect(content).toHaveStyle({ transform: "translate3d(-40px, 0, 0)" });
   });
   it.each([
     [-10, 0, false],

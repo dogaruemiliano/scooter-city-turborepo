@@ -11,7 +11,7 @@ The default mechanic role can claim unassigned issues and update or complete ass
 ## Admin completion from lists
 
 - Add an admin completion action to Todo and scooter-issue list items. Swiping opens the completion bottom sheet; completing the gesture alone does not submit.
-- Provide an accessible button/menu alternative for keyboard and desktop users.
+- Keep list entry swipe-only. The normal task link leads keyboard and desktop users to completion on the detail screen.
 - Let admins submit with an optional completion note. Keep notes mandatory for mechanics, enforced by the API rather than only by the form.
 - Reuse the completion form, shared bottom sheet, SaveButton, and localized action feedback. Keep request state responsible for pending, success, and failure.
 - Preserve existing assignees and record the actual completing admin in the audit/activity history. Do not fabricate a note when the input is empty.
@@ -57,7 +57,7 @@ The default mechanic role can claim unassigned issues and update or complete ass
 ## Implementation and verification
 
 - `ProblemCompletion` owns the completion request, controlled submission feedback, draft preservation, and recovery after stale or uncertain outcomes. List and detail entry points use it. Admin notes are optional; non-admin completion requires current assignment and nonempty notes in the API.
-- Shared `SwipeAction` uses theme gesture thresholds and has Storybook examples. The list also exposes a visible completion button. A swipe requests confirmation rather than submitting immediately.
+- Shared `SwipeAction` uses theme gesture thresholds and has Storybook examples. The list is swipe-only; the visible double-check completion button was removed at the user’s request. Keyboard users can complete from task details. A swipe requests confirmation rather than submitting immediately.
 - The creation endpoint assigns workers who lack general assignment permission to themselves. The form displays their default assignment. `GET /v1/problems/creation-scooters` supplies only scooters permitted by the existing scooter-read scope; creation prerequisites now accept assigned read scopes without requiring full fleet access.
 - Migration `20261104120000_mechanic_issue_creation` grants creation to existing active mechanic roles only when no explicit creation grant/restriction exists. It increments affected role/user access revisions and records the role change. Per-user overrides remain authoritative.
 - Reminder endpoints check admin and assignment permissions, current revision, current assignee, account eligibility, and notification access. A recipient-wide PostgreSQL transaction lock, explicit Read committed isolation, database timestamps, and the existing notification outbox enforce the rolling minute across admins, tasks, and API instances. An enqueue failure rolls back the cooldown. Delivery still respects the existing inbox/push policies.
@@ -69,7 +69,11 @@ Verification:
 - 187 API unit tests, 17 shared-contract tests, and 22 localization tests pass.
 - 16 focused PostgreSQL integration checks pass, including concurrent sends from different admins/tasks, expiry, enqueue rollback, self-assignment/reassignment, and migration preservation of explicit restrictions.
 - Web, API, UI, and theme type checks pass. Targeted lint and the shared UI Storybook build pass.
-- Browser plugin unavailable; regular Playwright verified the real components in an isolated preview with mocked API/session data. Desktop and mobile checks cover list-button and touch-swipe entry, the optional-note completion sheet, successful completion, the right-side reminder bell, and disabled cooldown. Screenshots show the shared sheet surface, no horizontal overflow, and no browser errors. No real reminder notifications were sent.
+- Browser plugin unavailable; regular Playwright verified the real components in an isolated preview with mocked API/session data. Desktop and mobile checks cover touch-swipe entry and detail completion, the optional-note completion sheet, successful completion, the right-side reminder bell, and disabled cooldown. Screenshots show the shared sheet surface, no horizontal overflow, and no browser errors. No real reminder notifications were sent.
 - The broader PostgreSQL suite has three existing rental checks that fail with its rental fixture; the fixture lacks the documents required by current rental readiness rules. Those checks were excluded from the focused task run. Rental behavior was not changed.
 
 Apply the included migration through the normal release process before relying on creation access for existing mechanic accounts.
+
+Swipe follow-up: the card follows the pointer without a transition while dragging, captures the pointer once after horizontal intent, and animates only the return. The green reveal is a separate rectangle with all four corners rounded and a theme-sized gap from the card.
+
+Follow-up validation: 53 focused swipe/list tests, web/UI type checks, targeted lint, and the Storybook build pass. The supplied screen recording was inspected. Desktop and mobile browser checks sampled slow touch movement and verified direct pointer tracking, four rounded corners, the gap between surfaces, and confirmation opening without submission.

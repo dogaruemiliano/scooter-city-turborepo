@@ -2,7 +2,6 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { CheckCheck } from "lucide-react";
 import { SwipeAction } from "./swipe-action";
-import { Button } from "./button";
 
 const meta = {
   title: "Interactions/SwipeAction",
@@ -23,15 +22,12 @@ function Example({ disabled = false }: { disabled?: boolean }) {
       >
         <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-card p-4 text-card-foreground">
           <span>Confirm workshop delivery</span>
-          <Button disabled={disabled} onClick={() => setRequested(true)}>
-            Complete
-          </Button>
         </div>
       </SwipeAction>
       <p role="status">
         {requested
           ? "Completion requested. The parent can now open its confirmation sheet."
-          : "Swipe left or use Complete."}
+          : "Swipe left to request completion. Task details provide the keyboard alternative."}
       </p>
     </div>
   );

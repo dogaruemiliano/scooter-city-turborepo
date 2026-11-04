@@ -14,7 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@repo/ui/components";
-import { CheckCheck, Clock, Paperclip } from "lucide-react";
+import { Clock, Paperclip } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { memberName } from "../_lib/member-name";
 
@@ -35,7 +35,6 @@ export function ProblemListItem({
   onToggle,
   href,
   variant = "default",
-  onComplete,
 }: {
   problem: v1.problems.Problem;
   expanded?: boolean;
@@ -43,7 +42,6 @@ export function ProblemListItem({
   href?: string;
   /** Omits scooter identity and moves badges into the header. */
   variant?: "default" | "simple";
-  onComplete?: () => void;
 }) {
   const difficulty = problem.scooterId === null ? null : problem.difficulty;
   const t = useTranslations("workspace.problems");
@@ -153,18 +151,6 @@ export function ProblemListItem({
         <CardContent className="flex flex-wrap gap-2">{badges}</CardContent>
       ) : null}
       <CardFooter className="mx-(--card-spacing) flex-wrap justify-between gap-3 rounded-none px-0 text-xs text-muted-foreground">
-        {onComplete ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="relative z-raised"
-            aria-label={t("completeTaskFor", { title: problem.title })}
-            onClick={onComplete}
-          >
-            <CheckCheck aria-hidden="true" />
-          </Button>
-        ) : null}
         {assignees.length > 1 ? (
           <AvatarGroup
             role="img"
