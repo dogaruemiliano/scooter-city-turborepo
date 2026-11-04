@@ -3,6 +3,18 @@ import { HttpStatus } from "@nestjs/common";
 import { localizeErrorMessage } from "./error-messages";
 
 describe("localizeErrorMessage", () => {
+  it("explains the worker's required completion notes in Romanian", () => {
+    expect(
+      localizeErrorMessage(
+        {
+          status: 400,
+          code: "PROBLEM_RESOLUTION_NOTES_REQUIRED",
+          message: "Resolution notes are required",
+        },
+        "ro",
+      ),
+    ).toBe("Adaugă note de rezolvare înainte de a finaliza această sarcină.");
+  });
   it.each(["ro", "en"] as const)(
     "replaces unexpected server messages with friendly %s copy",
     (locale) => {

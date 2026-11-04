@@ -6,6 +6,11 @@ import { spacing } from "./spacing";
  */
 export const motion = {
   gesture: {
+    swipeAction: {
+      axisLockDistance: spacing[2],
+      threshold: spacing[20],
+      maxTravel: spacing[24],
+    },
     pullToRefresh: {
       axisLockDistance: spacing[2],
       threshold: spacing[24],

@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   user: {
     id: "member",
     effectiveScopes: {
+      "scooters.read": ["ALL"],
       "problems.read": ["ALL"],
       "problems.create": ["ALL"],
       "problems.assign": ["ALL"],

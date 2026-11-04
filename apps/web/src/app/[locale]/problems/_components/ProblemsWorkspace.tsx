@@ -12,8 +12,11 @@ import {
   Plus,
   UserRound,
   Wrench,
+  CircleCheck,
 } from "lucide-react";
 import { v1 } from "@repo/api-shared";
+import { SwipeAction } from "@repo/ui/components/swipe-action";
+import { ProblemCompletion } from "./ProblemCompletion";
 import {
   Field,
   FieldLabel,
@@ -61,6 +64,9 @@ export function ProblemsWorkspace({ todo = false }: { todo?: boolean }) {
   const shared = useTranslations("shared");
   const { user } = useSession();
   const locale = resolveRouteLocale(useLocale());
+  const [completing, setCompleting] = useState<v1.problems.Problem | null>(
+    null,
+  );
   const defaultView = "";
   const [chosen, setChosen] = useState<ProblemFilters | null>(null);
   const filters: ProblemFilters = chosen ?? {
@@ -289,7 +295,9 @@ export function ProblemsWorkspace({ todo = false }: { todo?: boolean }) {
                         ? [
                             {
                               value: "available" as const,
-                              label: t("problems.available"),
+                              label: t(
+                                todo ? "todos.available" : "problems.available",
+                              ),
                             },
                           ]
                         : []),
@@ -477,27 +485,62 @@ export function ProblemsWorkspace({ todo = false }: { todo?: boolean }) {
         />
         {remote.data ? (
           <ProblemList
+            todo={todo}
             items={remote.data.items}
             status={status}
             empty={
               <ListEmpty>
                 {status || view !== defaultView
                   ? shared("list.noResults")
-                  : t("empty")}
+                  : t(todo ? "todos.empty" : "empty")}
               </ListEmpty>
             }
-            renderItem={(problem) => (
-              <ProblemListItem
-                problem={problem}
-                href={localizePath(
-                  `${todo ? "/todos" : "/problems"}/${encodeURIComponent(problem.id)}`,
-                  locale,
-                )}
-              />
-            )}
+            renderItem={(problem) => {
+              const mayComplete =
+                !!(user?.isAdmin || user?.isSuperAdmin) &&
+                canAccess(user, "problems.resolve", "ALL") &&
+                (problem.status === "open" || problem.status === "in_progress");
+              const card = (
+                <ProblemListItem
+                  problem={problem}
+                  onComplete={
+                    mayComplete ? () => setCompleting(problem) : undefined
+                  }
+                  href={localizePath(
+                    `${todo ? "/todos" : "/problems"}/${encodeURIComponent(problem.id)}`,
+                    locale,
+                  )}
+                />
+              );
+              return mayComplete ? (
+                <SwipeAction
+                  action={<CircleCheck aria-hidden="true" />}
+                  onAction={() => setCompleting(problem)}
+                >
+                  {card}
+                </SwipeAction>
+              ) : (
+                card
+              );
+            }}
           />
         ) : null}
       </ListLayout>
+      {completing ? (
+        <ProblemCompletion
+          key={completing.id}
+          problem={completing}
+          compact
+          open
+          onOpenChange={(open) => {
+            if (!open) setCompleting(null);
+          }}
+          onCompleted={() => {
+            setCompleting(null);
+            remote.reload();
+          }}
+        />
+      ) : null}
     </PageLayout>
   );
 }

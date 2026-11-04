@@ -26,12 +26,10 @@ import {
   CommentEventItem,
   CommentComposer,
   BottomSheet,
-  BottomSheetTrigger,
   BottomSheetContent,
   BottomSheetHeader,
   BottomSheetTitle,
   BottomSheetBody,
-  BottomSheetClose,
   Field,
   FieldLabel,
   FormActions,
@@ -53,7 +51,6 @@ import {
   CircleSlash,
   Flag,
   MoreVertical,
-  X,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
@@ -72,6 +69,8 @@ import { usePageRefresh } from "@/components/PageRefresh";
 import { ProblemScooterPicker } from "./ProblemScooterPicker";
 import { ProblemSections, type ProblemSectionData } from "./ProblemSections";
 import { ProblemPhotos } from "./ProblemPhotos";
+import { ProblemCompletion } from "./ProblemCompletion";
+import { AssigneeUserRow } from "./AssigneeUserCard";
 
 export function useProblemAssignees(enabled: boolean, todo = false) {
   const load = useCallback(
@@ -148,6 +147,14 @@ export function CreateProblem({
   const [fileError, setFileError] = useState<string | null>(null);
   const uploads = useRef(new Map<File, v1.problems.ProblemPhotoDraft>());
   const mayAssign = canAccess(user, "problems.assign", "ALL");
+  const creator = user
+    ? {
+        ...user,
+        roles: [],
+        firstName: user.firstName ?? null,
+        lastName: user.lastName ?? null,
+      }
+    : undefined;
   const assignees = useProblemAssignees(mayAssign, todo);
 
   const [initialValues] = useState(() =>
@@ -396,7 +403,11 @@ export function CreateProblem({
         </FieldLabel>
         <Textarea
           id={`${id}-description`}
-          placeholder={t("problems.descriptionPlaceholder")}
+          placeholder={t(
+            todo
+              ? "todos.descriptionPlaceholder"
+              : "problems.descriptionPlaceholder",
+          )}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           maxLength={4000}
@@ -428,6 +439,23 @@ export function CreateProblem({
             error={assignees.error}
             onRetry={assignees.reload}
           />
+        </Field>
+      ) : null}
+      {!mayAssign && !todo && !initialProblem && creator ? (
+        <Field>
+          <FieldLabel>{t("problems.assignee")}</FieldLabel>
+          <AssigneeUserRow
+            member={creator}
+            name={memberName(creator)}
+            action={
+              <span className="text-sm font-medium text-muted-foreground">
+                {t("problems.you")}
+              </span>
+            }
+          />
+          <p className="text-sm text-muted-foreground">
+            {t("problems.selfAssignedOnCreate")}
+          </p>
         </Field>
       ) : null}
       {initialProblem?.photos.length ? (
@@ -523,6 +551,7 @@ export function CreateProblem({
         </p>
       </Field>
       <ProblemSections
+        todo={todo}
         problem={sectionData}
         editable
         maySaveLocation={canAccess(user, "problems.update", "ALL")}
@@ -606,7 +635,7 @@ export function ProblemWork({
     actorId?: string;
   } | null>(null);
   const [reopenMessage, setReopenMessage] = useState("");
-  const [resolution, setResolution] = useState("");
+  const [completionBusy, setCompletionBusy] = useState(false);
   const [confirm, setConfirm] = useState<"reopen" | "cancel" | null>(null);
   const locale = resolveRouteLocale(useLocale());
   const todo = problem.scooterId === null;
@@ -625,7 +654,12 @@ export function ProblemWork({
     mayAssign && editable,
     problem.scooterId === null,
   );
-  const busy = task.busy || commentTask.busy || photosBusy || sectionsBusy;
+  const busy =
+    task.busy ||
+    commentTask.busy ||
+    photosBusy ||
+    sectionsBusy ||
+    completionBusy;
   useEffect(() => {
     onBusyChange?.(busy);
     return () => onBusyChange?.(false);
@@ -712,8 +746,10 @@ export function ProblemWork({
           return saved;
         }}
         onClaim={() => void task.run(() => mutate("/claim", "POST", {}))}
+        onReloadLatest={() => reload()}
       />
       <ProblemSections
+        todo={todo}
         problem={problem}
         editable={editable && can("problems.update")}
         maySaveLocation={canAccess(user, "problems.update", "ALL")}
@@ -751,52 +787,18 @@ export function ProblemWork({
           {t("problems.start")}
         </Button>
       ) : null}
-      {!compact ||
-      (problem.status === "in_progress" && can("problems.resolve")) ? (
-        <ProblemWorkPanel compact={compact} title={t("problems.completeTask")}>
-          {compact ? (
-            <>
-              <Feedback error={task.error} />
-              {retryAction}
-            </>
-          ) : null}
-          {problem.status === "in_progress" && can("problems.resolve") ? (
-            <form
-              className="flex flex-col gap-3"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void task.run(() =>
-                  mutate("/resolve", "POST", {
-                    resolutionNotes: resolution.trim(),
-                  }),
-                );
-              }}
-            >
-              <Field>
-                <FieldLabel htmlFor={`resolution-${problem.id}`}>
-                  {t("problems.resolution")}
-                </FieldLabel>
-                <Textarea
-                  id={`resolution-${problem.id}`}
-                  placeholder={t("problems.resolutionPlaceholder")}
-                  required
-                  maxLength={4000}
-                  value={resolution}
-                  onChange={(event) => setResolution(event.target.value)}
-                />
-              </Field>
-              <SaveButton
-                type="submit"
-                className="w-full"
-                disabled={busy || !resolution.trim()}
-                {...formAction("complete", {
-                  pending: busy,
-                  error: task.error,
-                })}
-              />
-            </form>
-          ) : null}
-        </ProblemWorkPanel>
+      {editable &&
+      can("problems.resolve") &&
+      (user?.isAdmin ||
+        user?.isSuperAdmin ||
+        (own && problem.status === "in_progress")) ? (
+        <ProblemCompletion
+          problem={problem}
+          compact={compact}
+          disabled={task.busy || commentTask.busy || photosBusy || sectionsBusy}
+          onBusyChange={setCompletionBusy}
+          onCompleted={reload}
+        />
       ) : null}
       {(editable && can("problems.update")) || mayReopen ? (
         <PageHeaderActions desktopTarget={actionsTarget}>
@@ -1040,48 +1042,6 @@ export function ProblemWork({
         }
       />
     </div>
-  );
-}
-
-function ProblemWorkPanel({
-  compact,
-  title,
-  children,
-}: {
-  compact: boolean;
-  title: string;
-  children: ReactNode;
-}) {
-  const shared = useTranslations("shared.actions");
-  if (!compact) return <>{children}</>;
-  return (
-    <BottomSheet>
-      <BottomSheetTrigger
-        render={
-          <Button className="sticky bottom-4 z-sticky order-last w-full shadow-primary" />
-        }
-      >
-        {title}
-      </BottomSheetTrigger>
-      <BottomSheetContent>
-        <BottomSheetHeader className="flex-row items-center justify-between gap-3">
-          <BottomSheetTitle>{title}</BottomSheetTitle>
-          <BottomSheetClose
-            render={
-              <Button
-                variant="ghost"
-                size="icon"
-                className="hidden shrink-0 lg:inline-flex"
-              />
-            }
-            aria-label={shared("close")}
-          >
-            <X aria-hidden="true" />
-          </BottomSheetClose>
-        </BottomSheetHeader>
-        <BottomSheetBody className="gap-6">{children}</BottomSheetBody>
-      </BottomSheetContent>
-    </BottomSheet>
   );
 }
 

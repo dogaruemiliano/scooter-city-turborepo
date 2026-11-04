@@ -241,6 +241,8 @@ export const tokens = {
     "1.5": 6,
     "2.5": 10,
     screenBottom: 8,
+    keyboardDockThreshold: 128,
+    iosKeyboardAccessoryClearance: 48,
   },
   dashedSurface: {
     borderWidth: 2,
@@ -388,6 +390,11 @@ export const tokens = {
   },
   motion: {
     gesture: {
+      swipeAction: {
+        axisLockDistance: 8,
+        threshold: 80,
+        maxTravel: 96,
+      },
       pullToRefresh: {
         axisLockDistance: 8,
         threshold: 96,

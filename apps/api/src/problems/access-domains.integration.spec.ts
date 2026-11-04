@@ -20,10 +20,72 @@ import { RentalsService } from "../rentals/rentals.service";
 import { v1 } from "@repo/api-shared";
 import { ProblemPhotosService } from "./problem-photos.service";
 import { ProblemsService } from "./problems.service";
+import * as notificationEvents from "../notifications/notification-events";
 
 // Opt-in only: these tests create and remove their own fixtures in a disposable database.
 const databaseUrl = process.env.ACCESS_DOMAIN_TEST_DATABASE_URL;
 const integration = databaseUrl ? describe : describe.skip;
+
+integration("mechanic creation migration", () => {
+  it.each([false, true])(
+    "adds creation once while preserving explicit restrictions (restricted=%s)",
+    async (restricted) => {
+      const url = new URL(databaseUrl!);
+      if (
+        !["localhost", "127.0.0.1"].includes(url.hostname) ||
+        !url.pathname.startsWith("/scooter_access_test_")
+      )
+        throw new Error("Disposable local test database required");
+      const client = new Client({ connectionString: databaseUrl });
+      const schema = `task_migration_${randomUUID().replaceAll("-", "")}`;
+      await client.connect();
+      try {
+        await client.query(`CREATE SCHEMA "${schema}"`);
+        await client.query(`SET search_path TO "${schema}"`);
+        await client.query(`
+        CREATE TYPE "PermissionScope" AS ENUM ('ASSIGNED', 'ALL');
+        CREATE TABLE "Role" (id TEXT PRIMARY KEY, slug TEXT, revision INTEGER DEFAULT 1, "updatedAt" TIMESTAMPTZ DEFAULT now(), "archivedAt" TIMESTAMPTZ);
+        CREATE TABLE "RolePermission" ("roleId" TEXT, "permissionKey" TEXT, scopes "PermissionScope"[], PRIMARY KEY ("roleId", "permissionKey"));
+        CREATE TABLE "User" (id TEXT PRIMARY KEY, "accessRevision" INTEGER DEFAULT 1);
+        CREATE TABLE "UserRole" ("userId" TEXT, "roleId" TEXT);
+        CREATE TABLE "AuditEvent" (id TEXT PRIMARY KEY, type TEXT, "targetType" TEXT, "targetId" TEXT, meta JSONB);
+        CREATE TABLE "NotificationEvent" (type TEXT, "createdAt" TIMESTAMPTZ);
+        INSERT INTO "Role" (id, slug) VALUES ('mechanic-role', 'mechanic');
+        INSERT INTO "User" (id) VALUES ('worker');
+        INSERT INTO "UserRole" VALUES ('worker', 'mechanic-role');
+      `);
+        if (restricted)
+          await client.query(
+            `INSERT INTO "RolePermission" VALUES ('mechanic-role', 'problems.create', '{}')`,
+          );
+        await client.query(
+          readFileSync(
+            "prisma/migrations/20261104120000_mechanic_issue_creation/migration.sql",
+            "utf8",
+          ),
+        );
+        expect(
+          (
+            await client.query(
+              `SELECT array_to_json(scopes) AS scopes FROM "RolePermission" WHERE "permissionKey" = 'problems.create'`,
+            )
+          ).rows,
+        ).toEqual([{ scopes: restricted ? [] : ["ALL"] }]);
+        expect(
+          (await client.query(`SELECT "accessRevision" FROM "User"`)).rows,
+        ).toEqual([{ accessRevision: restricted ? 1 : 2 }]);
+        expect(
+          (await client.query(`SELECT revision FROM "Role"`)).rows,
+        ).toEqual([{ revision: restricted ? 1 : 2 }]);
+      } finally {
+        await client.query("ROLLBACK");
+        await client.query("SET search_path TO public");
+        await client.query(`DROP SCHEMA "${schema}" CASCADE`);
+        await client.end();
+      }
+    },
+  );
+});
 
 integration("Access domains against PostgreSQL", () => {
   let db: PrismaService;
@@ -130,6 +192,8 @@ integration("Access domains against PostgreSQL", () => {
             { permissionKey: "problems.update", scopes: ["ASSIGNED"] },
             { permissionKey: "problems.resolve", scopes: ["ASSIGNED"] },
             { permissionKey: "problems.claim", scopes: ["AVAILABLE"] },
+            { permissionKey: "problems.create", scopes: ["ALL"] },
+            { permissionKey: "notifications.receive", scopes: ["ASSIGNED"] },
             { permissionKey: "scooters.read", scopes: ["ASSIGNED"] },
           ],
         },
@@ -313,6 +377,165 @@ integration("Access domains against PostgreSQL", () => {
       cleared.revision,
     );
     expect(claimed.assignees?.map((member) => member.id)).toEqual([mechanicA]);
+  });
+
+  it("creates mechanic-owned work atomically while retaining scooter visibility and assignment boundaries", async () => {
+    await problems.create(
+      admin,
+      v1.problems.createProblemInputSchema.parse({
+        scooterId: scooterIds[0],
+        title: "Existing assigned work",
+        difficulty: "easy",
+        assigneeIds: [mechanicA],
+      }),
+    );
+    const created = await problems.create(
+      mechanicA,
+      v1.problems.createProblemInputSchema.parse({
+        scooterId: scooterIds[0],
+        title: "Mechanic's new issue",
+        difficulty: "easy",
+      }),
+    );
+    expect(created.assignees?.map(({ id }) => id)).toEqual([mechanicA]);
+    expect(created.reporter?.id).toBe(mechanicA);
+    const options = await problems.creationScooters(mechanicA);
+    expect(options.items.map(({ id }) => id)).toContain(scooterIds[0]);
+    expect(options.items.map(({ id }) => id)).not.toContain(scooterIds[1]);
+    await expect(
+      problems.create(
+        mechanicA,
+        v1.problems.createProblemInputSchema.parse({
+          scooterId: scooterIds[0],
+          title: "Crafted assignment",
+          difficulty: "easy",
+          assigneeIds: [mechanicB],
+        }),
+      ),
+    ).rejects.toThrow(ForbiddenException);
+    await problems.assign(admin, created.id, {
+      revision: created.revision,
+      assigneeIds: [mechanicB],
+    });
+    await expect(
+      problems.resolve(mechanicA, created.id, {
+        revision: created.revision + 1,
+        resolutionNotes: "Not mine anymore",
+      }),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it("serializes simultaneous reminders across different admins and tasks, then permits a send after expiry", async () => {
+    const first = await problems.create(
+      admin,
+      v1.problems.createProblemInputSchema.parse({
+        scooterId: scooterIds[0],
+        title: "First reminder task",
+        difficulty: "easy",
+        assigneeIds: [mechanicB],
+      }),
+    );
+    const second = await problems.create(
+      admin,
+      v1.problems.createProblemInputSchema.parse({
+        scooterId: scooterIds[1],
+        title: "Second reminder task",
+        difficulty: "easy",
+        assigneeIds: [mechanicB],
+      }),
+    );
+    await db.user.update({
+      where: { id: reporter },
+      data: { isSuperAdmin: true },
+    });
+    try {
+      const results = await Promise.all([
+        problems.remind(admin, first.id, {
+          revision: first.revision,
+          assigneeId: mechanicB,
+        }),
+        problems.remind(reporter, second.id, {
+          revision: second.revision,
+          assigneeId: mechanicB,
+        }),
+      ]);
+      expect(results.filter(({ sent }) => sent)).toHaveLength(1);
+      expect(results[0].nextAllowedAt).toBe(results[1].nextAllowedAt);
+      const where = {
+        type: "issue.reminder",
+        assignedRecipientIds: { has: mechanicB },
+      };
+      expect(await db.notificationEvent.count({ where })).toBe(1);
+      const event = await db.notificationEvent.findFirstOrThrow({ where });
+      expect(event.adminRecipientIds).toEqual([]);
+      expect(event.assignedRecipientIds).toEqual([mechanicB]);
+      await db.notificationEvent.updateMany({
+        where,
+        data: {
+          createdAt: new Date(
+            Date.now() - v1.problems.PROBLEM_REMINDER_COOLDOWN_MS - 1_000,
+          ),
+        },
+      });
+      expect(
+        (
+          await problems.remind(admin, first.id, {
+            revision: first.revision,
+            assigneeId: mechanicB,
+          })
+        ).sent,
+      ).toBe(true);
+    } finally {
+      await db.user.update({
+        where: { id: reporter },
+        data: { isSuperAdmin: false },
+      });
+    }
+  });
+
+  it("rolls back the reminder and its cooldown when enqueueing fails", async () => {
+    const task = await problems.create(
+      admin,
+      v1.problems.createProblemInputSchema.parse({
+        scooterId: scooterIds[0],
+        title: "Rollback reminder",
+        difficulty: "easy",
+        assigneeIds: [mechanicA],
+      }),
+    );
+    const original = notificationEvents.publishNotificationEvent;
+    const failing = jest
+      .spyOn(notificationEvents, "publishNotificationEvent")
+      .mockImplementationOnce(async (tx, input) => {
+        await original(tx, input);
+        throw new Error("Simulated enqueue failure");
+      });
+    try {
+      await expect(
+        problems.remind(admin, task.id, {
+          revision: task.revision,
+          assigneeId: mechanicA,
+        }),
+      ).rejects.toThrow("Simulated enqueue failure");
+      expect(
+        await db.notificationEvent.count({
+          where: {
+            type: "issue.reminder",
+            assignedRecipientIds: { has: mechanicA },
+          },
+        }),
+      ).toBe(0);
+    } finally {
+      failing.mockRestore();
+    }
+    expect(
+      (
+        await problems.remind(admin, task.id, {
+          revision: task.revision,
+          assigneeId: mechanicA,
+        })
+      ).sent,
+    ).toBe(true);
   });
 
   it("allows exactly one concurrent claim and denies the former assignee after reassignment", async () => {

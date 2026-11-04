@@ -73,6 +73,10 @@ function matchErrorMessage(
     return { key: "api.errors.imageStorageBucketUnavailable" };
   }
 
+  if (input.code === "PROBLEM_RESOLUTION_NOTES_REQUIRED") {
+    return { key: "api.errors.problemResolutionRequired" };
+  }
+
   if (input.code === "IMAGE_STORAGE_UNAVAILABLE") {
     return { key: "api.errors.imageStorageUnavailable" };
   }

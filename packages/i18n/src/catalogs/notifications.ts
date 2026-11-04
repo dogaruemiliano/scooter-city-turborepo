@@ -1,4 +1,5 @@
 const enIssueEvents = {
+  reminder: "{actor} sent you a reminder about {subject}.",
   created: "{actor} created {subject}.",
   updated: "{actor} updated {subject}.",
   assigned: "{actor} changed the assignment for {subject}.",
@@ -12,6 +13,7 @@ const enIssueEvents = {
   hold: { changed: "{actor} changed the maintenance hold for {subject}." },
 } as const;
 const roIssueEvents = {
+  reminder: "{actor} ți-a trimis un memento pentru {subject}.",
   created: "{actor} a creat {subject}.",
   updated: "{actor} a actualizat {subject}.",
   assigned: "{actor} a modificat atribuirea pentru {subject}.",

@@ -115,7 +115,12 @@ export class NotificationDispatcherService {
                 ...current.assignedRecipientIds,
                 ...current.removedRecipientIds,
               ]),
-            ].filter((id) => id !== current.actorId);
+            ].filter(
+              (id) =>
+                id !== current.actorId ||
+                current.type === "issue.reminder" ||
+                current.type === "todo.reminder",
+            );
             const candidates = await tx.user.findMany({
               where: {
                 id: { in: ids },

@@ -178,6 +178,14 @@ export const Mobile: Story = {
       <Conversation />
     </div>
   ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "On a phone, focus the composer to dock it above the software keyboard. iOS 26 gets clearance for its floating form toolbar; Android and older iOS stay at the reported keyboard edge. Dismissing the keyboard restores the composer to the thread. Desktop browser previews do not render native keyboard chrome.",
+      },
+    },
+  },
 };
 
 export const Success: Story = {
