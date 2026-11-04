@@ -75,6 +75,7 @@ import {
 } from "./PageHeaderActions";
 import { useMobilePageScroll } from "./useMobilePageScroll";
 import { PageRefreshSurface } from "./PageRefresh";
+import { KeyboardAwareScrollView } from "@repo/ui/components/keyboard-aware-scroll-view";
 import { PageTitleOverrideContext } from "./PageTitleOverride";
 import {
   PageHeaderNavigationContext,
@@ -357,7 +358,7 @@ function AppShellContent({
               ) : null}
             </div>
           </header>
-          <div
+          <KeyboardAwareScrollView
             ref={pageScrollRef}
             data-slot="app-page-scroll"
             onScroll={onPageScroll}
@@ -366,7 +367,7 @@ function AppShellContent({
             {/* Padding on the scrollport adds to bottom-sticky offsets. Keep it
                 in the scrolling content so floating actions count safe areas once. */}
             <PageRefreshSurface key={pathname}>{children}</PageRefreshSurface>
-          </div>
+          </KeyboardAwareScrollView>
         </SidebarInset>
       </PageHeaderActionsContext.Provider>
     </PageHeaderNavigationContext.Provider>

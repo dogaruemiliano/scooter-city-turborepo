@@ -11,6 +11,7 @@ export * from "./button";
 export * from "./calendar-picker";
 export * from "./card";
 export * from "./horizontal-scroll-area";
+export * from "./keyboard-aware-scroll-view";
 export * from "./checkbox";
 export * from "./country-select";
 export * from "./date-parts-input";

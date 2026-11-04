@@ -1,32 +1,22 @@
 "use client";
 
-import {
-  useEffect,
-  useRef,
-  useState,
-  useId,
-  type ComponentProps,
-  type ReactNode,
-} from "react";
+import { useId, type ComponentProps, type ReactNode } from "react";
 import { cn } from "@repo/ui/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "./avatar";
 import { Label } from "./label";
 import { InputGroup, InputGroupTextarea } from "./input-group";
 import { CircleCheck, RotateCcw, Send } from "lucide-react";
-import { breakpoints, spacing } from "@repo/theme";
 import { SaveButton, type SaveButtonProps } from "./save-button";
 
 /** A conversation surface. Data fetching, ordering and pagination belong to the caller. */
 function CommentThread({
   title,
   children,
-  empty,
   composer,
   className,
   ...props
 }: Omit<ComponentProps<"section">, "title"> & {
   title: string;
-  empty?: ReactNode;
   composer?: ReactNode;
 }) {
   const headingId = useId();
@@ -43,8 +33,8 @@ function CommentThread({
       <h3 id={headingId} className="text-base font-semibold">
         {title}
       </h3>
-      {children ?? <p className="text-sm text-muted-foreground">{empty}</p>}
       {composer}
+      {children}
     </section>
   );
 }
@@ -175,132 +165,57 @@ function CommentComposer({
   ...props
 }: CommentComposerProps) {
   const id = useId();
-  const formRef = useRef<HTMLFormElement>(null);
-  const [focused, setFocused] = useState(false);
-  const [keyboardInset, setKeyboardInset] = useState<number | null>(null);
-  const [reservedHeight, setReservedHeight] = useState(0);
-  useEffect(() => {
-    const viewport = window.visualViewport;
-    if (!focused || !viewport) {
-      setKeyboardInset(null);
-      return;
-    }
-    const initialHeight = window.innerHeight;
-    const isIOS =
-      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    // Safari freezes the OS version in its UA. contrast-color shipped with
-    // WebKit 26, when iOS introduced the floating form toolbar. Its geometry
-    // isn't exposed to web content; older iOS already insets the viewport.
-    const accessoryClearance =
-      isIOS && window.CSS?.supports("color", "contrast-color(currentColor)")
-        ? spacing.iosKeyboardAccessoryClearance
-        : 0;
-    const update = () => {
-      const inset = Math.max(
-        0,
-        window.innerHeight - viewport.height - viewport.offsetTop,
-      );
-      setKeyboardInset(
-        window.innerWidth < breakpoints.md &&
-          viewport.scale === 1 &&
-          Math.max(inset, initialHeight - viewport.height) >=
-            spacing.keyboardDockThreshold
-          ? inset + accessoryClearance
-          : null,
-      );
-    };
-    update();
-    viewport.addEventListener("resize", update);
-    viewport.addEventListener("scroll", update);
-    window.addEventListener("resize", update);
-    return () => {
-      viewport.removeEventListener("resize", update);
-      viewport.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
-    };
-  }, [focused]);
-  useEffect(() => {
-    const form = formRef.current;
-    if (!form || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() =>
-      setReservedHeight(form.getBoundingClientRect().height),
-    );
-    observer.observe(form);
-    return () => observer.disconnect();
-  }, []);
   const pending = submitButton.state === "pending";
   const blocked = disabled || pending || submitButton.state === "success";
   return (
-    <div
-      style={keyboardInset !== null ? { height: reservedHeight } : undefined}
+    <form
+      data-slot="comment-composer"
+      aria-busy={pending || undefined}
+      className={cn("flex min-w-0 flex-col gap-3", className)}
+      {...props}
+      onSubmit={(event) => {
+        if (blocked || !value.trim()) {
+          event.preventDefault();
+          return;
+        }
+        onSubmit?.(event);
+      }}
     >
-      <form
-        ref={formRef}
-        data-slot="comment-composer"
-        data-keyboard-docked={keyboardInset !== null || undefined}
-        style={keyboardInset !== null ? { bottom: keyboardInset } : undefined}
-        onFocusCapture={() => setFocused(true)}
-        onBlurCapture={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget))
-            setFocused(false);
-        }}
-        aria-busy={pending || undefined}
-        className={cn(
-          "flex min-w-0 flex-col gap-3",
-          keyboardInset !== null &&
-            "fixed inset-x-0 z-sticky bg-background px-4 py-2",
-          className,
-        )}
-        {...props}
-        onSubmit={(event) => {
-          if (blocked || !value.trim()) {
-            event.preventDefault();
-            return;
-          }
-          onSubmit?.(event);
-        }}
-      >
-        <Label className="sr-only" htmlFor={id}>
-          {label}
-        </Label>
-        <InputGroup className="h-auto items-end gap-1 rounded-3xl p-1 md:h-auto">
-          <InputGroupTextarea
-            id={id}
-            rows={1}
-            autoResize
-            className="min-h-11 max-h-36 resize-none overflow-y-auto px-3 py-2.5 text-base leading-6 md:min-h-11 md:py-2.5 md:text-sm"
-            value={value}
-            onChange={(event) => onValueChange(event.target.value)}
-            placeholder={placeholder}
-            maxLength={maxLength}
-            required
-            disabled={blocked}
-            aria-invalid={error ? true : undefined}
-            aria-describedby={error ? `${id}-error` : undefined}
-          />
-          <SaveButton
-            type="submit"
-            iconOnly
-            icon={<Send aria-hidden="true" />}
-            className="size-11 min-h-11 min-w-11"
-            onMouseDown={(event) => event.preventDefault()}
-            disabled={blocked || !value.trim()}
-            {...submitButton}
-          />
-        </InputGroup>
-        {error ? (
-          <p
-            id={`${id}-error`}
-            role="alert"
-            className="text-sm text-destructive"
-          >
-            {error}
-          </p>
-        ) : null}
-        {recovery}
-      </form>
-    </div>
+      <Label className="sr-only" htmlFor={id}>
+        {label}
+      </Label>
+      <InputGroup className="h-auto items-end gap-1 rounded-3xl p-1 md:h-auto">
+        <InputGroupTextarea
+          id={id}
+          rows={1}
+          autoResize
+          className="min-h-11 max-h-36 resize-none overflow-y-auto px-3 py-2.5 text-base leading-6 md:min-h-11 md:py-2.5 md:text-sm"
+          value={value}
+          onChange={(event) => onValueChange(event.target.value)}
+          placeholder={placeholder}
+          maxLength={maxLength}
+          required
+          disabled={blocked}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? `${id}-error` : undefined}
+        />
+        <SaveButton
+          type="submit"
+          iconOnly
+          icon={<Send aria-hidden="true" />}
+          className="size-11 min-h-11 min-w-11"
+          onMouseDown={(event) => event.preventDefault()}
+          disabled={blocked || !value.trim()}
+          {...submitButton}
+        />
+      </InputGroup>
+      {error ? (
+        <p id={`${id}-error`} role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+      {recovery}
+    </form>
   );
 }
 

@@ -776,7 +776,7 @@ export function ProblemWork({
         <Button
           className={
             compact
-              ? "sticky bottom-4 z-sticky order-last w-full shadow-primary"
+              ? "sticky bottom-4 z-sticky order-last w-full shadow-primary group-data-[keyboard-open=true]/keyboard-aware:static"
               : "self-start"
           }
           disabled={busy || !assignedIds.length}
@@ -1176,16 +1176,12 @@ function ProblemActivity({
           {t("loading")}
         </p>
       ) : null}
-      {remote.data && !remote.data.items.length ? (
+      {kind === "activity" && remote.data && !remote.data.items.length ? (
         <p className="text-sm text-muted-foreground">
-          {t(
-            kind === "comments"
-              ? "problems.noComments"
-              : "problems.noSystemActivity",
-          )}
+          {t("problems.noSystemActivity")}
         </p>
       ) : null}
-      {remote.data ? (
+      {remote.data?.items.length ? (
         <ol className="flex flex-col gap-4">
           {remote.data.items
             .filter((entry) =>
