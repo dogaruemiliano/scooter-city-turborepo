@@ -511,6 +511,120 @@ describe("problem details page", () => {
   );
 
   it.each(
+    (["admin", "superadmin", "mechanic"] as const).flatMap((role) =>
+      (["open", "in_progress", "resolved", "cancelled"] as const).flatMap(
+        (status) => [false, true].map((todo) => ({ role, status, todo })),
+      ),
+    ),
+  )(
+    "shows one status-appropriate detail action ($role, $status, todo=$todo)",
+    async ({ role, status, todo }) => {
+      mocks.user.id = role === "mechanic" ? "mechanic" : "admin";
+      mocks.user.isAdmin = role === "admin";
+      mocks.user.isSuperAdmin = role === "superadmin";
+      mocks.user.effectiveScopes = {
+        "problems.read": ["ALL"],
+        "problems.update": ["ALL"],
+        "problems.resolve": ["ALL"],
+      };
+      mocks.fetch.mockImplementation(async (url: string) =>
+        url.includes("/activity")
+          ? { items: [], total: 0, page: 1, pageSize: 25 }
+          : {
+              ...problem,
+              status,
+              ...(todo
+                ? { scooterId: null, scooter: null, difficulty: null }
+                : {}),
+            },
+      );
+      render(
+        <NextIntlClientProvider locale="en" messages={messages.en}>
+          <ProblemDetailScreen id="problem" />
+        </NextIntlClientProvider>,
+      );
+      await screen.findByRole("heading", { name: problem.title });
+      const starts = screen.queryAllByRole("button", { name: "Start work" });
+      const completes = screen.queryAllByRole("button", {
+        name: "Complete task",
+      });
+      expect(starts).toHaveLength(status === "open" ? 1 : 0);
+      expect(completes).toHaveLength(status === "in_progress" ? 1 : 0);
+    },
+  );
+
+  it.each([false, true])(
+    "switches the single admin action after starting and pausing (todo=%s)",
+    async (todo) => {
+      mocks.user.isAdmin = true;
+      mocks.user.effectiveScopes = {
+        "problems.read": ["ALL"],
+        "problems.update": ["ALL"],
+        "problems.resolve": ["ALL"],
+      };
+      let current = {
+        ...problem,
+        status: "open" as v1.problems.Problem["status"],
+        ...(todo ? { scooterId: null, scooter: null, difficulty: null } : {}),
+      };
+      mocks.fetch.mockImplementation(
+        async (
+          url: string,
+          _schema: unknown,
+          options?: { json?: { startWork?: boolean; pauseWork?: boolean } },
+        ) => {
+          if (url.includes("/activity"))
+            return { items: [], total: 0, page: 1, pageSize: 25 };
+          if (options?.json?.startWork || options?.json?.pauseWork)
+            current = {
+              ...current,
+              status: options.json.startWork ? "in_progress" : "open",
+              revision: current.revision + 1,
+            };
+          return current;
+        },
+      );
+      render(
+        <NextIntlClientProvider locale="en" messages={messages.en}>
+          <ProblemDetailScreen id="problem" />
+        </NextIntlClientProvider>,
+      );
+      const user = userEvent.setup();
+      await user.click(
+        await screen.findByRole("button", { name: "Start work" }),
+      );
+      const trigger = await screen.findByRole("button", {
+        name: "Complete task",
+      });
+      expect(screen.queryByRole("button", { name: "Start work" })).toBeNull();
+      await user.click(trigger);
+      const sheet = await screen.findByRole("dialog", {
+        name: "Complete task",
+      });
+      expect(trigger).toHaveAttribute("aria-hidden", "true");
+      expect(trigger).toHaveClass("invisible");
+      expect(
+        screen.getAllByRole("button", { name: "Complete task" }),
+      ).toHaveLength(1);
+      await user.click(within(sheet).getByRole("button", { name: "Close" }));
+      await waitFor(() => expect(sheet).not.toBeInTheDocument());
+      expect(trigger).not.toHaveAttribute("aria-hidden");
+      expect(trigger).not.toHaveClass("invisible");
+      expect(
+        screen.getAllByRole("button", { name: "Complete task" }),
+      ).toHaveLength(1);
+      await user.click(screen.getByRole("button", { name: "More actions" }));
+      await user.click(
+        await screen.findByRole("menuitem", { name: "Pause work" }),
+      );
+      await screen.findByRole("button", { name: "Start work" });
+      expect(
+        screen.queryByRole("button", { name: "Complete task" }),
+      ).toBeNull();
+    },
+  );
+
+  it.each(
     (["in_progress", "resolved", "cancelled"] as const).flatMap((status) =>
       [false, true].map((isMobile) => ({ status, isMobile })),
     ),

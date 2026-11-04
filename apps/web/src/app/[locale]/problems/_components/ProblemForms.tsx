@@ -787,11 +787,9 @@ export function ProblemWork({
           {t("problems.start")}
         </Button>
       ) : null}
-      {editable &&
+      {problem.status === "in_progress" &&
       can("problems.resolve") &&
-      (user?.isAdmin ||
-        user?.isSuperAdmin ||
-        (own && problem.status === "in_progress")) ? (
+      (user?.isAdmin || user?.isSuperAdmin || own) ? (
         <ProblemCompletion
           problem={problem}
           compact={compact}
