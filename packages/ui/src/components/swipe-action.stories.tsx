@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { CheckCheck } from "lucide-react";
+import { PageLayout } from "./page-layout";
 import { SwipeAction } from "./swipe-action";
 
 const meta = {
@@ -34,3 +35,19 @@ function Example({ disabled = false }: { disabled?: boolean }) {
 }
 export const Default: Story = { render: () => <Example /> };
 export const Disabled: Story = { render: () => <Example disabled /> };
+export const ViewportEdge: Story = {
+  parameters: {
+    layout: "fullscreen",
+    docs: {
+      description: {
+        story:
+          "Swipe on a touch device or with a pen. The card stays visible through the page gutter and leaves the viewport without being cropped at its original position. Only the green action surface clips its contents.",
+      },
+    },
+  },
+  render: () => (
+    <PageLayout width="full" className="pb-6">
+      <Example />
+    </PageLayout>
+  ),
+};
